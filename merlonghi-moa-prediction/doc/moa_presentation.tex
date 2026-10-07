@@ -1,0 +1,729 @@
+\documentclass[9pt,aspectratio=169]{beamer}
+
+% ================= THEME =================
+\usetheme{metropolis}
+\usepackage{appendixnumberbeamer}
+\metroset{block=fill,progressbar=frametitle,numbering=fraction,sectionpage=none}
+
+% ================= FONTS =================
+\usepackage{iftex}
+\ifpdftex
+  % Se usi il compilatore predefinito di Overleaf (pdfLaTeX)
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lato}
+  \usepackage[scale=0.82]{FiraMono}
+\else
+  % Se imposti il compilatore su XeLaTeX o LuaLaTeX nelle impostazioni di Overleaf
+  \usepackage{fontspec}
+  \IfFontExistsTF{Lato}{
+    \setmainfont{Lato}
+    \setsansfont{Lato}
+  }{
+    \usepackage{lato}
+  }
+  \IfFontExistsTF{Fira Code}{
+    \setmonofont{Fira Code}[Scale=0.82]
+  }{
+    \usepackage[scale=0.82]{FiraMono}
+  }
+\fi
+
+% ================= PACKAGES =================
+\usepackage{listings}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric,decorations.pathreplacing}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+
+% ================= COLOR PALETTE =================
+\definecolor{primary}{HTML}{0E2A3F}      % deep petrol navy
+\definecolor{secondary}{HTML}{1A7A6E}    % teal
+\definecolor{accent}{HTML}{E0A32E}       % warm amber
+\definecolor{accent2}{HTML}{C1502E}      % terracotta
+\definecolor{bgcream}{HTML}{FAF7F0}      % warm off-white background
+\definecolor{inkgrey}{HTML}{2B2B2B}
+
+\setbeamercolor{background canvas}{bg=bgcream}
+\setbeamercolor{normal text}{fg=primary}
+\setbeamercolor{frametitle}{bg=primary,fg=bgcream}
+\setbeamercolor{progress bar}{fg=accent,bg=primary!25}
+\setbeamercolor{title separator}{fg=accent}
+\setbeamercolor{alerted text}{fg=accent2}
+\setbeamercolor{example text}{fg=secondary}
+\setbeamercolor{block title}{bg=secondary,fg=bgcream}
+\setbeamercolor{block body}{bg=secondary!10,fg=primary}
+\setbeamercolor{block title alerted}{bg=accent2,fg=bgcream}
+\setbeamercolor{block body alerted}{bg=accent2!10,fg=primary}
+\setbeamercolor{block title example}{bg=primary!85,fg=bgcream}
+\setbeamercolor{block body example}{bg=primary!8,fg=primary}
+\setbeamercolor{itemize item}{fg=secondary}
+\setbeamercolor{itemize subitem}{fg=accent2}
+\setbeamertemplate{itemize item}{\raisebox{0.15ex}{\textbullet}}
+
+% ================= CODE STYLE =================
+\definecolor{codebg}{HTML}{F1ECDF}
+\definecolor{codekw}{HTML}{0E2A3F}
+\definecolor{codecom}{HTML}{8A8A82}
+\definecolor{codestr}{HTML}{C1502E}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecom}\itshape,
+  stringstyle=\color{codestr},
+  backgroundcolor=\color{codebg},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{primary!25},
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  language=Python,
+  columns=fullflexible
+}
+
+% ================= TIKZ NODE STYLES (model diagrams) =================
+\tikzset{
+  layer/.style={draw=primary, thick, rounded corners=2pt, fill=secondary!12,
+    minimum height=7mm, align=center, font=\scriptsize, text=primary},
+  layerhi/.style={draw=accent2, thick, rounded corners=2pt, fill=accent!25,
+    minimum height=7mm, align=center, font=\scriptsize, text=primary},
+  tok/.style={draw=primary, thick, rounded corners=1pt, fill=secondary!15,
+    minimum width=6mm, minimum height=6mm, font=\tiny, text=primary},
+  clstok/.style={draw=accent2, thick, rounded corners=1pt, fill=accent!35,
+    minimum width=6mm, minimum height=6mm, font=\tiny, text=primary},
+  tree/.style={draw=primary, thick, fill=secondary!12, minimum width=9mm,
+    minimum height=6mm, align=center, font=\tiny, text=primary},
+  flowarr/.style={-{Stealth[length=2mm]}, thick, primary},
+  attn/.style={-, accent2!70, opacity=0.55}
+}
+
+\title{MoA Prediction}
+\subtitle{Multi-Model Ensemble for Mechanisms-of-Action Classification}
+\author{Marco Merlonghi}
+\date{\today}
+
+\begin{document}
+
+% ---------------------------------------------------------------
+% 1. TITLE
+% ---------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture, overlay]
+    \fill[primary] (current page.south west) rectangle (current page.north east);
+    \fill[secondary!85] ([xshift=-2cm,yshift=1.4cm]current page.south west) --
+      ([xshift=6cm,yshift=1.4cm]current page.south west) --
+      ([xshift=2cm,yshift=-1cm]current page.south west) -- cycle;
+    \fill[accent] ([xshift=-1cm,yshift=-0.2cm]current page.north east) --
+      ([xshift=-7cm,yshift=-0.2cm]current page.north east) --
+      ([xshift=-3cm,yshift=1.6cm]current page.north east) -- cycle;
+    \node[anchor=west, text=bgcream, font=\Huge\bfseries] at ([xshift=1cm,yshift=1cm]current page.west)
+      {MoA Prediction};
+    \node[anchor=west, text=accent, font=\Large] at ([xshift=1.05cm,yshift=0.2cm]current page.west)
+      {A Multi-Model Ensemble for Mechanism-of-Action Classification};
+    \node[anchor=west, text=bgcream!70, font=\small] at ([xshift=1.05cm,yshift=-0.7cm]current page.west)
+      {Marco Merlonghi \quad\textbar\quad Project Work in Machine Learning and Data Mining};
+  \end{tikzpicture}
+\end{frame}
+
+\section{The Challenge}
+
+% ---------------------------------------------------------------
+% 2. ABOUT THE COMPETITION
+% ---------------------------------------------------------------
+\begin{frame}{About the Competition}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+      \begin{itemize}
+        \item \textbf{Host:} Laboratory for Innovation Science at Harvard (LISH), with the Broad Institute's Connectivity Map (LINCS);
+        \item \textbf{Platform:} Kaggle -- \texttt{\url{https://kaggle.com/c/lish-moa}}; 
+        \item \textbf{Timeline:} launched and closed in 2020 (final deadline Nov.\ 30, 2020);
+        \item \textbf{Scale:} several thousand participating teams ($\sim$4{,}300 reported by published write-ups);
+        \item \textbf{Data origin:} L1000 assay -- a high-throughput assay measuring how human cell lines respond transcriptionally to a chemical or genetic perturbation.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{block}{Why it matters}
+        Mapping a compound's gene-expression and cell-viability signature to its mechanism of action accelerates \textbf{drug discovery} and \textbf{repurposing}, replacing slow, costly wet-lab characterisation with a computational first pass.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 3. THE PROBLEM
+% ---------------------------------------------------------------
+\begin{frame}{The Problem}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item \textbf{Task:} multi-label classification of \textbf{206 mechanisms of action (MoA)}
+        \item \textbf{Input:} gene-expression (\texttt{g-}) and cell-viability (\texttt{c-}) profiles
+        \item \textbf{Metric:} mean multi-label binary log loss, clipped to avoid $\log(0)$
+        \item Control rows (\texttt{cp\_type == ctl\_vehicle}) carry \textbf{no MoA} and are excluded from training
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{block}{Why an ensemble?}
+        Dense nets and tree models fail differently on rare positives $\Rightarrow$ blending several architectures on different preprocessing variants reduces variance.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\section{Pipeline Overview}
+
+% ---------------------------------------------------------------
+% 6. PIPELINE AT A GLANCE
+% ---------------------------------------------------------------
+\begin{frame}{Pipeline at a Glance}
+  \centering
+  \begin{tikzpicture}[
+      node distance=6mm and 8mm,
+      box/.style={draw=primary, rounded corners, fill=secondary!10, align=center, minimum height=8mm, font=\scriptsize, text=primary},
+      arr/.style={-{Stealth[length=2mm]}, thick, primary}
+    ]
+    \node[box] (data) {Raw CSV\\features/targets};
+    \node[box, right=of data] (clean) {Clean \&\\align};
+    \node[box, right=of clean] (feat) {Row stats +\\one-hot};
+    \node[box, right=of feat] (split) {5-fold\\MultilabelStratifiedKFold};
+    \node[box,  below=of split] (raw) {RankGauss\\raw (no PCA)};
+    \node[box, left=of raw] (pca) {RankGauss\\+PCA};
+    \node[box, below=of pca, fill=accent!25] (nn) {MLP / ResNet\\FT-Transformer};
+    \node[box, below=of raw, fill=accent!25] (cb) {CatBoost};
+    \coordinate (mid) at ($(nn)!0.5!(cb)$);
+    \node[box, below=8mm of mid, fill=accent2!20] (blend) {Nested-CV\\weighted blend};
+    \node[box, below=of blend, fill=secondary!25] (sub) {submission.csv};
+
+    \draw[arr] (data) -- (clean);
+    \draw[arr] (clean) -- (feat);
+    \draw[arr] (feat) -- (split);
+    \draw[arr] (split) -- (pca);
+    \draw[arr] (split) -- (raw);
+    \draw[arr] (raw) -- (nn);
+    \draw[arr] (pca) -- (nn);
+    \draw[arr] (raw) -- (cb);
+    \draw[arr] (nn) -- (blend);
+    \draw[arr] (cb) -- (blend);
+    \draw[arr] (blend) -- (sub);
+  \end{tikzpicture}
+\end{frame}
+
+\section{Setup \& Data}
+
+% ---------------------------------------------------------------
+% 7. SETUP
+% ---------------------------------------------------------------
+\begin{frame}[fragile]{Setup and Data Cleaning}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item \texttt{iterative-stratification} for multi-label stratified K-fold
+        \item \texttt{PYTORCH\_CUDA\_ALLOC\_CONF} to reduce GPU memory fragmentation
+        \item \textbf{5 folds}, \textbf{3 seeds} $\{42, 202, 2024\}$ $\Rightarrow$ bagging
+        \item AMP enabled only if a GPU is present
+      \end{itemize}
+    
+      \begin{lstlisting}
+N_FOLDS = 5
+SEEDS = [42, 202, 2024]
+PCA_G_COMPONENTS = 50
+PCA_C_COMPONENTS = 15
+EARLY_STOPPING_PATIENCE = 8
+LABEL_SMOOTHING = 0.001
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+        \begin{itemize}
+        \item \texttt{load\_raw\_data}: reads \texttt{train\_features}, \texttt{train\_targets\_scored}, \texttt{test\_features}, \texttt{sample\_submission}
+        \item \texttt{clean\_and\_align}: drops NaNs/duplicates, sorts both tables by \texttt{sig\_id}
+        \item \textbf{Strict alignment check} before proceeding:
+      \end{itemize}
+      \begin{lstlisting}
+    assert features.shape[0] == targets.shape[0]
+    assert (features["sig_id"].values == targets["sig_id"].values).all()
+      \end{lstlisting}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 9. FEATURE ENGINEERING
+% ---------------------------------------------------------------
+\begin{frame}[fragile]{Feature Engineering}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Row statistics} (separately for \texttt{g-} and \texttt{c-} blocks):
+      \begin{itemize}
+        \item sum, mean, std, kurtosis, skewness
+        \item captures the overall activation level per sample
+      \end{itemize}
+      \vspace{0.8cm}
+      \textbf{Categorical encoding:}
+      \begin{itemize}
+        \item one-hot on \texttt{cp\_time} and \texttt{cp\_dose}
+        \item test columns realigned to the training reference columns
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{lstlisting}
+df["g_sum"]  = df[g_cols].sum(axis=1)
+df["g_mean"] = df[g_cols].mean(axis=1)
+df["g_std"]  = df[g_cols].std(axis=1)
+df["g_kurtosis"] = df[g_cols].kurtosis(axis=1)
+df["g_skew"] = df[g_cols].skew(axis=1)
+# ... mirrored for c_cols
+      \end{lstlisting}
+      \begin{lstlisting}
+def encode_categoricals(df, dummy_cols, reference_columns=None):
+    """One-hot encodes cp_time/cp_dose, aligned to the training columns."""
+    df = pd.get_dummies(df, columns=dummy_cols, dtype=np.float64)
+    if reference_columns is not None:
+        df = df.reindex(columns=reference_columns, fill_value=0)
+    return df
+      \end{lstlisting}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\section{Model Architectures}
+
+% ---------------------------------------------------------------
+% 10. MODELS INTRO
+% ---------------------------------------------------------------
+\begin{frame}{Four Models, Four Perspectives}
+    \vspace{6mm}
+    \centering
+    
+    \begin{tikzpicture}[
+      node distance=10mm and 15mm,
+      box/.style={draw=primary, rounded corners, fill=secondary!10, align=center, minimum height=18mm, minimum width=55mm, text=primary},
+      arr/.style={-{Stealth[length=2mm]}, thick, primary}
+    ]
+    \node[box] (model1) {\textbf{MoAMLP}\\dense, BatchNorm + Dropout};
+    \node[box, right= of model1] (model2){\textbf{TabularResNet}\\residual blocks};
+    \node[box, below= of model1] (model3) {\textbf{FT-Transformer}\\self-attention over features};
+    \node[box, right= of model3] (model4) {\textbf{CatBoost}\\gradient-boosted trees};
+    
+    \end{tikzpicture}
+    \\
+    \vspace{6mm}
+      \centering
+      Diversity comes from different \emph{inductive biases}, not just different seeds.
+\end{frame}
+
+
+% ---------------------------------------------------------------
+% 11. MLP DIAGRAM
+% ---------------------------------------------------------------
+\begin{frame}{MoAMLP -- How It Works}
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \centering
+      \begin{tikzpicture}[node distance=3mm, scale=0.92, transform shape]
+        \node[layer] (in) {Input ($\approx$900 features)};
+        \node[layer, below=of in] (bn0) {BatchNorm + Dropout(0.2)};
+        \node[layerhi, below=of bn0] (d1) {Dense 1024 + BN + SiLU + Dropout(0.3)};
+        \node[layerhi, below=of d1] (d2) {Dense 1024 + BN + SiLU + Dropout(0.3)};
+        \node[layerhi, below=of d2] (d3) {Dense 512 + BN + SiLU + Dropout(0.3)};
+        \node[layer, below=of d3] (out) {Output 206 (logits $\to$ sigmoid)};
+        \draw[flowarr] (in) -- (bn0);
+        \draw[flowarr] (bn0) -- (d1);
+        \draw[flowarr] (d1) -- (d2);
+        \draw[flowarr] (d2) -- (d3);
+        \draw[flowarr] (d3) -- (out);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.6\textwidth}
+      \begin{itemize}
+        \item Pure \textbf{feed-forward} network: every neuron combines \emph{all} input features
+        \item BatchNorm stabilises scale, Dropout prevents overfitting
+        \item SiLU (Swish) non-linearity in every block
+        \item Consumes \textbf{RankGauss + PCA} features (compact variant)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 12. RESNET DIAGRAM
+% ---------------------------------------------------------------
+\begin{frame}{TabularResNet -- How It Works}
+  \begin{columns}[T]
+    \begin{column}{0.3\textwidth}
+      \centering
+      \begin{tikzpicture}[node distance=3mm, scale=0.88, transform shape]
+        \node[layer] (in) {Input};
+        \node[layer, below=of in] (proj) {Input proj.\ Linear+BN+SiLU};
+        \node[layerhi, below=5mm of proj] (b1) {Block 1: Drop-Lin-BN-SiLU-Drop-Lin-BN};
+        \node[layer, below=of b1] (add1) {$+$ (skip) $\to$ SiLU};
+        \node[layerhi, below=5mm of add1] (b2) {Block 2: Drop-Lin-BN-SiLU-Drop-Lin-BN};
+        \node[layer, below=of b2] (add2) {$+$ (skip) $\to$ SiLU};
+        \node[layer, below=of add2] (out) {Output proj.\ $\to$ 206};
+
+        \draw[flowarr] (in) -- (proj);
+        \draw[flowarr] (proj) -- (b1);
+        \draw[flowarr] (b1) -- (add1);
+        \draw[flowarr] (add1) -- (b2);
+        \draw[flowarr] (b2) -- (add2);
+        \draw[flowarr] (add2) -- (out);
+
+        \draw[flowarr, accent2, thick] (proj.east) .. controls +(20mm,0) and +(15mm,0) .. (add1.east);
+        \draw[flowarr, accent2, thick] (add1.east) .. controls +(28mm,0) and +(15mm,0) .. (add2.east);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.6\textwidth}
+      \begin{itemize}
+        \item The curved orange arrows are the \textbf{residual (skip) connections}: the block's input jumps straight to the final sum
+        \item Eases gradient flow, stabilises deeper networks
+        \item 2 residual blocks, \texttt{hidden\_dim = 512}
+        \item Same feature pipeline as the MLP (RankGauss + PCA)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 13. FT-TRANSFORMER DIAGRAM
+% ---------------------------------------------------------------
+\begin{frame}{FT-Transformer -- How It Works}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.9, transform shape]
+          % 1. Nodi in alto (Tokens)
+          \node[clstok] (cls) at (0,0) {CLS};
+          \node[tok, right=1.5mm of cls] (t1) {$f_1$};
+          \node[tok, right=1.5mm of t1] (t2) {$f_2$};
+          \node[tok, right=1.5mm of t2] (t3) {$f_3$};
+          \node[tok, right=1.5mm of t3] (t4) {$\cdots$};
+          \node[tok, right=1.5mm of t4] (t5) {$f_n$};
+        
+          % Connessioni di attenzione tra i token
+          \foreach \a in {cls,t1,t2,t3,t5} {
+            \foreach \b in {cls,t1,t2,t3,t5} {
+              \draw[attn] (\a) -- (\b);
+            }
+          }
+        
+          % 2. Blocco contenitore unico per tutti i token
+          \begin{scope}[on background layer]
+            \node[
+              draw=primary,
+              fill=secondary!8,
+              rounded corners=3pt,
+              inner sep=3mm,
+              fit=(cls) (t5)
+            ] (tokens_box) {};
+          \end{scope}
+        
+          % 3. Nodi sottostanti riallineati rispetto al blocco contenitore
+          \node[layerhi, below=8mm of tokens_box, minimum width=55mm] (enc) {Multi-head Self-Attention + FFN $\times\,2$ blocks};
+          \node[layer, below=of enc, minimum width=30mm] (ln) {LayerNorm(CLS token)};
+          \node[layer, below=of ln, minimum width=30mm] (head) {Linear head $\to$ 206};
+        
+          % 4. Frecce di flusso
+          \draw[flowarr] (tokens_box.south) -- (enc.north);
+          \draw[flowarr] (enc) -- (ln);
+          \draw[flowarr] (ln) -- (head);
+        \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{itemize}
+        \item Each scalar feature $\to$ its own \textbf{token} ($\sim$870 tokens/row)
+        \item A learnable \textbf{[CLS]} token is prepended
+        \item \textbf{Self-attention} (thin lines) connects every token to every other
+        \item The CLS output summarises the row $\to$ classification head
+        \item $O(L^2)$ cost $\Rightarrow$ smaller batch size (64)
+        \item Consumes \textbf{raw RankGauss} features (no PCA): one token per original feature
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 14. CATBOOST DIAGRAM
+% ---------------------------------------------------------------
+\begin{frame}{CatBoost -- How It Works}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.92, transform shape]
+        \node[tree] (t1) at (0,0) {Tree 1};
+        \node[layer, right=7mm of t1, font=\tiny] (r1) {residual};
+        \node[tree, right=7mm of r1] (t2) {Tree 2};
+        \node[layer, right=7mm of t2, font=\tiny] (r2) {residual};
+        \node[, right=7mm of r2] (dots){$\cdots$};
+        \node[tree, right=7mm of dots] (t3) {Tree $N$};
+        
+        \draw[flowarr] (t1) -- (r1);
+        \draw[flowarr] (r1) -- (t2);
+        \draw[flowarr] (t2) -- (r2);
+        \draw[flowarr] (r2) -- (dots);
+        \draw[flowarr] (dots) -- (t3);
+        \node[layerhi, below=8mm of t2, minimum width=55mm] (sum) {Weighted sum of predictions across all trees};
+        \node[layer, below=of sum, minimum width=50mm] (out) {MultiLogloss $\to$ 206 probabilities};
+        \draw[flowarr] (t1.south) |- (sum.west);
+        \draw[flowarr] (t2.south) -- (sum.north);
+        \draw[flowarr] (t3.south) |- (sum.east);
+        \draw[flowarr, dashed] (dots.south) |- (sum.north east);
+        \draw[flowarr] (sum) -- (out);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{itemize}
+        \item \textbf{Gradient boosting}: each tree corrects the residual error of the previous one
+        \item A single multi-output \texttt{MultiLogloss} fit, not 206 separate fits
+        \item Splits stay aligned to the original features $\to$ trained on \textbf{raw RankGauss} (no PCA)
+        \item Targets constant within a fold are excluded from the fit and filled with the observed constant
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\section{Training}
+
+% ---------------------------------------------------------------
+% 15. METRIC & LOSS
+% ---------------------------------------------------------------
+\begin{frame}{Metric, Loss Variants and Per-fold Training Routine}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Evaluation metric}
+      \[
+        \mathcal{L} = -\frac{1}{N \cdot 206}\sum y\log \hat y + (1-y)\log(1-\hat y)
+      \]
+      predictions clipped to $[\epsilon, 1-\epsilon]$, with $\epsilon = 10^{-15}$.
+      \\
+      \vspace{8mm}
+      \textbf{Optional variants}
+      \begin{itemize}
+        \item \textbf{Focal loss:} down-weights easy examples, useful with rare positives
+        \item \textbf{Label smoothing} (0.001): $y(1-\epsilon) + 0.5\epsilon$
+        \item Validation loss \textbf{always} uses non-smoothed targets $\to$ honest comparison
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item \textbf{AMP} (\texttt{torch.amp.GradScaler}) for speed and stability
+        \item \textbf{Early stopping} (patience = 8 epochs)
+        \item \textbf{ReduceLROnPlateau} scheduler
+        \item \textbf{In-RAM checkpointing}: best \texttt{state\_dict} cloned to CPU, written to disk once at the end
+        \item Explicit \texttt{torch.cuda.empty\_cache()} so sibling workers reclaim VRAM
+      \end{itemize}
+      \begin{alertblock}{Why it matters}
+        Avoids dozens of slow disk writes per fold and prevents GPU memory creep across 45 parallel jobs.
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 17. PREPROCESSING
+% ---------------------------------------------------------------
+\begin{frame}{Two Preprocessing Pipelines}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{PCA variant (MLP, ResNet)}
+        VarianceThreshold $\to$ RankGauss (\texttt{QuantileTransformer}) $\to$ PCA(50) on \texttt{g-}, PCA(15) on \texttt{c-} $\to$ concat + raw dummies
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Raw variant (FT-Transformer, CatBoost)}
+        VarianceThreshold $\to$ RankGauss, \textbf{no PCA} -- keeps one token/split per original feature
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{2mm}
+  \small Both fitted \textbf{per fold} on the training split only, cached to disk as \texttt{.joblib}, and reused for CatBoost to avoid refitting.
+\end{frame}
+
+\section{Cross-Validation \& Ensembling}
+
+% ---------------------------------------------------------------
+% 18. NN CV SCALE
+% ---------------------------------------------------------------
+\begin{frame}[fragile]{NN Cross-Validation at Scale}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item $3$ models $\times$ $3$ seeds $\times$ $5$ folds $=$ \textbf{45 jobs}
+        \item \texttt{joblib} + \texttt{loky} backend, GPUs assigned \textbf{round-robin}
+        \item 2 GPUs $\times$ 2 jobs/GPU $=$ \textbf{4 parallel workers}
+        \item Predictions averaged over the 3 seeds per (fold, model)
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{lstlisting}
+NN_JOBS_PER_GPU = 2
+N_JOBS_NN = N_GPUS * NN_JOBS_PER_GPU
+
+Parallel(n_jobs=N_JOBS_NN,
+         backend="loky")(
+  delayed(_train_nn_job)(...)
+  for job in jobs
+)
+      \end{lstlisting}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% 19. BLENDING METHODOLOGY
+% ---------------------------------------------------------------
+\begin{frame}{Ensemble Blending: Methodology}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Weight search}
+      \begin{itemize}
+        \item Softmax-reparameterised weights on the simplex
+        \item \textbf{Nelder--Mead}, not SLSQP: avoids a zero finite-difference gradient stalling the optimizer at $x_0$
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{Nested CV}
+      \begin{itemize}
+        \item Weights fit on $k-1$ folds, scored on the held-out fold
+        \item Prevents an over-optimistic blend score
+        \item Final weights = mean across folds
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \begin{exampleblock}{Two scores reported}
+    \emph{naive} OOF blend score (same data used to fit the weights) vs.\ \emph{honest} nested-CV score
+  \end{exampleblock}
+\end{frame}
+
+\section{Results}
+
+% ---------------------------------------------------------------
+% 20. RESULTS: FOLD-BY-FOLD
+% ---------------------------------------------------------------
+\begin{frame}{Results -- Fold-by-Fold Validation Loss}
+  \centering
+  \begin{tabular}{@{}cccccc@{}}
+    \toprule
+    \textbf{Fold} & \textbf{MLP} & \textbf{ResNet} & \textbf{FT-Transformer} & \textbf{CatBoost} \\
+    \midrule
+    0 & 0.01666 & 0.01669 & 0.01670 & 0.01707 \\
+    1 & 0.01674 & 0.01685 & 0.01693 & 0.01709$^{*}$ \\
+    2 & 0.01632 & 0.01635 & 0.01630 & 0.01676 \\
+    3 & 0.01653 & 0.01655 & 0.01667 & 0.01704$^{*}$ \\
+    4 & 0.01680 & 0.01684 & 0.01688 & 0.01704 \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2mm}
+
+  \small $^{*}$ 1 constant target in the training fold, excluded from the CatBoost fit and filled with the observed constant.
+  \vspace{3mm}
+
+  \normalsize MLP/ResNet/FT-Transformer values are the mean over 3 seeds.\\ CatBoost is trained once per fold (no seed bagging).
+\end{frame}
+
+% ---------------------------------------------------------------
+% 21. RESULTS: OOF SUMMARY + CHART
+% ---------------------------------------------------------------
+\begin{frame}{Results -- Out-of-Fold Summary}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \centering
+      \begin{tabular}{@{}lc@{}}
+        \toprule
+        \textbf{Model} & \textbf{OOF log loss} \\
+        \midrule
+        MLP & 0.01635 \\
+        ResNet & \textbf{0.01619} \\
+        FT-Transformer & 0.01630 \\
+        CatBoost & 0.01700 \\
+        \midrule
+        Ensemble (honest) & \textbf{0.01595} \\
+        \bottomrule
+      \end{tabular}
+      \vspace{3mm}
+
+      \small\textbf{Timing:} NN CV 87.0 min \textbar\ CatBoost CV 28.5 min
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=1, every node/.style={font=\scriptsize}]
+        % baseline axis
+        \draw[primary!60] (0,3) -- (0,-39mm);
+        % bar rows: (label, width in mm, y offset in mm, fill color, value label)
+        \foreach \lbl/\w/\y/\col/\val in {
+          MLP/23.4mm/0mm/secondary!70/0.01635,
+          ResNet/19.0mm/-9mm/secondary!70/0.01619,
+          {FT-Transformer}/22.0mm/-18mm/secondary!70/0.01630,
+          CatBoost/41.3mm/-27mm/secondary!70/0.01700
+        } {
+          \node[anchor=east, text=primary] at (-1mm,\y) {\lbl};
+          \draw[fill=\col, draw=primary] (0,\y-2mm) rectangle (\w,\y+2mm);
+          \node[anchor=west, text=primary] at (\w+1mm,\y) {\val};
+        }
+        % separating line before ensemble
+        \draw[primary!40, dashed] (-22mm,-33mm) -- (50mm,-33mm);
+        \node[anchor=east, text=primary, font=\scriptsize\bfseries] at (-1mm,-39mm) {Ensemble};
+        \draw[fill=accent2, draw=primary] (0,-41mm) rectangle (12.4mm,-37mm);
+        \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (13.4mm,-39mm) {0.01595};
+        \node[anchor=north, text=primary!70, font=\tiny] at (20mm,-44mm) {OOF log loss (lower is better)};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Results -- Ensemble Blend (Nested CV)}
+\centering
+  % TESTO A (In alto)
+  {\large\bfseries Final score and weights per fold}\\[1mm]
+  \begin{tabular}{@{}cccccc@{}}
+        \toprule
+        \textbf{Fold} & \textbf{Score} & $w_{\text{mlp}}$ & $w_{\text{resnet}}$ & $w_{\text{ft}}$ & $w_{\text{cb}}$ \\
+        \midrule
+        0 & 0.01597 & 0.061 & 0.460 & 0.345 & 0.134 \\
+        1 & 0.01616 & 0.030 & 0.475 & 0.375 & 0.120 \\
+        2 & 0.01555 & 0.049 & 0.453 & 0.357 & 0.140 \\
+        3 & 0.01594 & 0.042 & 0.453 & 0.369 & 0.136 \\
+        4 & 0.01613 & 0.064 & 0.455 & 0.368 & 0.114 \\
+        \bottomrule
+    \end{tabular}
+
+  \vspace{0.5cm}
+
+  % COLONNE B e C (In basso)
+  
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Final weights (mean across folds)}
+        \small
+        MLP 4.9\% \textbar\ ResNet 45.9\% \textbar\ FT-Transformer 36.3\% \textbar\ CatBoost 12.9\%
+      \end{block}
+    \end{column}
+
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{Honest nested-blend score}
+        $0.01595 \pm 0.00022$
+      \end{exampleblock}
+      \small Naive OOF blend (same data used to fit weights): \textbf{0.01595} -- matches the honest score almost exactly, a sign the blend is not overfit to the validation folds.
+    \end{column}
+
+  \end{columns}
+
+\end{frame}
+% ---------------------------------------------------------------
+% 26. KEY DECISIONS
+% ---------------------------------------------------------------
+\begin{frame}{Key Engineering Decisions}
+  \begin{itemize}
+    \item \textbf{Per-feature RankGauss}, PCA only where it helps (dense nets), never for trees
+    \item \textbf{Multi-seed bagging} smooths single-run noise before blending
+    \item \textbf{Round-robin GPU scheduling} keeps multi-GPU training balanced
+    \item \textbf{In-RAM checkpoints} minimise I/O across 45 parallel jobs
+    \item \textbf{Nested-CV blend weights} avoid leaking validation information into the final score
+  \end{itemize}
+\end{frame}
+
+\end{document}
