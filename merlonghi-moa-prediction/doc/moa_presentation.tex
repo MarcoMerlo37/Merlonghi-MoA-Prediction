@@ -142,8 +142,9 @@
         \item \textbf{Host:} Laboratory for Innovation Science at Harvard (LISH), with the Broad Institute's Connectivity Map (LINCS);
         \item \textbf{Platform:} Kaggle -- \url{https://kaggle.com/c/lish-moa};
         \item \textbf{Timeline:} launched and closed in 2020 (final deadline Nov.\ 30, 2020);
-        \item \textbf{Scale:} several thousand teams (see the Kaggle leaderboard page);
-        \item \textbf{Data origin:} L1000 assay -- a high-throughput assay measuring how human cell lines respond transcriptionally to a chemical or genetic perturbation.
+        \item \textbf{Scale:} 4,373 teams on the final leaderboard;
+        \item \textbf{Format:} code competition -- a notebook is submitted and re-run by Kaggle on a hidden test set;
+        \item \textbf{Data origin:} gene expression from the L1000 assay, which measures how human cell lines respond transcriptionally to a chemical perturbation; cell viability from the PRISM assay.
       \end{itemize}
     \end{column}
     \begin{column}{0.42\textwidth}
@@ -163,16 +164,49 @@
       \begin{itemize}
         \item \textbf{Task:} multi-label classification of \textbf{206 mechanisms of action (MoA)}
         \item \textbf{Input:} 772 gene-expression (\texttt{g-}) and 100 cell-viability (\texttt{c-}) features, plus \texttt{cp\_time} and \texttt{cp\_dose}
-        \item \textbf{Size:} $\approx$23.8k training rows, $\approx$22k after removing controls
-        \item \textbf{Imbalance:} positives are very rare (mean predicted probability on treated test rows: 0.0037)
+        \item \textbf{Size:} 23,814 training rows: 21,948 treated and 1,866 controls (7.8\%)
+        \item \textbf{Imbalance:} only 0.373\% of the (treated row, target) cells are positive
         \item \textbf{Metric:} mean multi-label binary log loss, clipped to avoid $\log(0)$
         \item Control rows (\texttt{cp\_type == ctl\_vehicle}) carry \textbf{no MoA}: excluded from training, set to 0 at submission
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
       \begin{block}{Why an ensemble?}
-        Dense nets and tree models fail differently on rare positives $\Rightarrow$ blending several architectures on different preprocessing variants reduces variance.
+        Blending different model families (dense net, attention, trees) fed with different preprocessing is a standard way to reduce variance. The blend gain is measured in this project; whether the models' errors really differ was \textbf{not} measured.
       \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+% EXPLORATORY DATA ANALYSIS
+% ---------------------------------------------------------------
+\begin{frame}{Exploratory Data Analysis}
+  \begin{columns}[T]
+    \begin{column}{0.56\textwidth}
+      \begin{itemize}
+        \item \textbf{Controls:} 1,866 rows, \textbf{0 positive labels} -- predicting 0 for them is safe
+        \item \textbf{Label cardinality} (treated rows): 34.2\% have no label, 57.1\% one, 8.7\% two or more (max 7)
+        \item \textbf{Target imbalance:} positives per target range from 1 to 832 (median 38); \textbf{53 of 206 targets} have fewer than 20 positives
+        \item \textbf{Design:} \texttt{cp\_time} 24/48/72 h (7,166 / 7,602 / 7,180 treated rows), \texttt{cp\_dose} D1/D2 (11,196 / 10,752)
+      \end{itemize}
+      \begin{alertblock}{Consequences for the design}
+        Rare targets dominate the difficulty $\Rightarrow$ \textbf{multilabel-stratified} folds, so every target keeps its positives in each fold; controls are dropped from training.
+      \end{alertblock}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \centering
+      {\small\textbf{Positive labels per treated row}}\\[2mm]
+      \begin{tikzpicture}[every node/.style={font=\scriptsize}]
+        % bar height = 0.55 mm per percentage point
+        \draw[primary!60] (0,0) -- (52mm,0);
+        \foreach \x/\h/\lbl/\val in {5mm/18.8mm/{0}/{34.2\%}, 21mm/31.4mm/{1}/{57.1\%}, 37mm/4.8mm/{2+}/{8.7\%}} {
+          \draw[fill=secondary!70, draw=primary] (\x,0) rectangle (\x+10mm,\h);
+          \node[anchor=south, text=primary] at (\x+5mm,\h+0.5mm) {\val};
+          \node[anchor=north, text=primary] at (\x+5mm,-0.5mm) {\lbl};
+        }
+        \node[anchor=north, text=primary!70, font=\tiny] at (26mm,-4.5mm) {labels per row -- share of treated rows};
+      \end{tikzpicture}
     \end{column}
   \end{columns}
 \end{frame}
@@ -184,22 +218,21 @@
 % ---------------------------------------------------------------
 \begin{frame}{Pipeline at a Glance}
   \centering
-  \begin{tikzpicture}[
-      node distance=6mm and 8mm,
-      box/.style={draw=primary, rounded corners, fill=secondary!10, align=center, minimum height=8mm, font=\scriptsize, text=primary},
+  \begin{tikzpicture}[scale=0.88, transform shape,
+      box/.style={draw=primary, rounded corners, fill=secondary!10, align=center, minimum height=8mm, minimum width=26mm, font=\scriptsize, text=primary},
       arr/.style={-{Stealth[length=2mm]}, thick, primary}
     ]
-    \node[box] (data) {Raw CSV\\features/targets};
-    \node[box, right=of data] (clean) {Clean \&\\align};
-    \node[box, right=of clean] (feat) {Row stats +\\one-hot};
-    \node[box, right=of feat] (split) {5-fold\\MultilabelStratifiedKFold};
-    \node[box, below=of split] (raw) {VarThr.\ + RankGauss\\(no PCA)};
-    \node[box, left=of raw] (pca) {VarThr.\ + RankGauss\\+ PCA};
-    \node[box, below=of pca, fill=accent!25] (nn) {ResNet\\3 seeds};
-    \node[box, below=of raw, fill=accent!25] (cb) {FT-Transformer (3 seeds)\\CatBoost};
-    \coordinate (mid) at ($(nn)!0.5!(cb)$);
-    \node[box, below=8mm of mid, fill=accent2!20] (blend) {Nested-CV\\weighted blend};
-    \node[box, right=of blend, fill=secondary!25] (sub) {submission.csv\\(ctl rows = 0)};
+    \node[box] (data) at (0,0) {Raw CSV\\features/targets};
+    \node[box] (clean) at (3.2,0) {Clean \& align,\\drop control rows};
+    \node[box] (feat) at (6.4,0) {Row stats +\\one-hot};
+    \node[box] (split) at (9.6,0) {5-fold multilabel\\stratified CV};
+    \node[box] (pca) at (6.6,-1.6) {VarThr.\ + RankGauss\\+ PCA};
+    \node[box] (raw) at (11.4,-1.6) {VarThr.\ + RankGauss\\(no PCA)};
+    \node[box, fill=accent!25, minimum width=22mm] (nn) at (6.6,-3.2) {ResNet\\3 seeds};
+    \node[box, fill=accent!25, minimum width=22mm] (ft) at (10.0,-3.2) {FT-Transformer\\3 seeds};
+    \node[box, fill=accent!25, minimum width=22mm] (cb) at (13.0,-3.2) {CatBoost\\1 fit per fold};
+    \node[box, fill=accent2!20] (blend) at (9.6,-4.8) {Nested-CV\\weighted blend};
+    \node[box, fill=secondary!25] (sub) at (13.0,-4.8) {submission.csv\\(ctl rows = 0)};
 
     \draw[arr] (data) -- (clean);
     \draw[arr] (clean) -- (feat);
@@ -207,28 +240,61 @@
     \draw[arr] (split) -- (pca);
     \draw[arr] (split) -- (raw);
     \draw[arr] (pca) -- (nn);
+    \draw[arr] (raw) -- (ft);
     \draw[arr] (raw) -- (cb);
     \draw[arr] (nn) -- (blend);
+    \draw[arr] (ft) -- (blend);
     \draw[arr] (cb) -- (blend);
     \draw[arr] (blend) -- (sub);
   \end{tikzpicture}
 \end{frame}
 
-\section{Setup \& Data}
-
 % ---------------------------------------------------------------
-% SETUP, CLEANING, HYPERPARAMETERS
+% PREPROCESSING
 % ---------------------------------------------------------------
-\begin{frame}[fragile]{Setup, Data Cleaning and Hyperparameters}
+\begin{frame}{Two Preprocessing Pipelines}
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
-      \begin{itemize}
-        \item \texttt{iterative-stratification} for multi-label stratified K-fold
-        \item \texttt{PYTORCH\_CUDA\_ALLOC\_CONF} to reduce GPU memory fragmentation
-        \item \textbf{5 folds}, \textbf{3 seeds} $\{42, 202, 2024\}$ $\Rightarrow$ bagging
-        \item AMP enabled only if a GPU is present
-      \end{itemize}
+      \begin{block}{PCA variant (ResNet)}
+        VarianceThreshold $\to$ RankGauss (\texttt{QuantileTransformer}) $\to$ PCA(50) on \texttt{g-}, PCA(15) on \texttt{c-} $\to$ \textbf{concatenate} transformed features, PCA components and raw dummies ($\approx$950 columns)
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Raw variant (FT-Transformer, CatBoost)}
+        VarianceThreshold $\to$ RankGauss, \textbf{no PCA} -- keeps one token/split per original feature ($\approx$890 columns)
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{2mm}
+  \small Both fitted \textbf{per fold} on the training split only and cached to disk as \texttt{.joblib}. The raw pipeline fitted for the transformer is reused by CatBoost within the same run; stale caches are cleared at the start of each run. The fitted pipelines are saved as artifacts, so the inference notebook only applies them (no refitting).
+\end{frame}
 
+% ---------------------------------------------------------------
+% SETUP, CLEANING, FEATURES, HYPERPARAMETERS
+% ---------------------------------------------------------------
+\begin{frame}[fragile]{Cleaning, Feature Engineering and Hyperparameters}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Cleaning and alignment}
+      \begin{itemize}
+        \item \texttt{clean\_and\_align}: drops NaNs/duplicates, keeps the \texttt{sig\_id}s present in both tables, sorts by \texttt{sig\_id}
+        \item Control rows dropped from training
+        \item \textbf{Strict alignment check} before proceeding:
+      \end{itemize}
+      \begin{lstlisting}
+assert features.shape[0] == targets.shape[0]
+assert (features["sig_id"].values
+        == targets["sig_id"].values).all()
+      \end{lstlisting}
+      \vspace{1mm}
+      \textbf{Feature engineering}
+      \begin{itemize}
+        \item Row sum, mean, std, kurtosis, skewness, separately for the \texttt{g-} and \texttt{c-} blocks
+        \item One-hot on \texttt{cp\_time} and \texttt{cp\_dose}; test columns realigned to the training columns
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \textbf{Main hyperparameters}
       \begin{lstlisting}
 N_FOLDS = 5
 SEEDS = [42, 202, 2024]
@@ -242,59 +308,10 @@ PCA_C_COMPONENTS = 15
 CATBOOST: 250 iters, depth 5,
           lr 0.08
       \end{lstlisting}
-    \end{column}
-    \begin{column}{0.5\textwidth}
       \begin{itemize}
-        \item \texttt{load\_raw\_data}: reads \texttt{train\_features}, \texttt{train\_targets\_scored}, \texttt{test\_features}, \texttt{sample\_submission}
-        \item \texttt{clean\_and\_align}: drops NaNs/duplicates, keeps the \texttt{sig\_id}s present in both tables, sorts by \texttt{sig\_id}
-        \item \textbf{Strict alignment check} before proceeding:
+        \item \texttt{iterative-stratification} for multilabel stratified K-fold
+        \item AMP enabled only if a GPU is present
       \end{itemize}
-      \begin{lstlisting}
-assert features.shape[0] == targets.shape[0]
-assert (features["sig_id"].values
-        == targets["sig_id"].values).all()
-      \end{lstlisting}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ---------------------------------------------------------------
-% FEATURE ENGINEERING
-% ---------------------------------------------------------------
-\begin{frame}[fragile]{Feature Engineering}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \textbf{Row statistics} (separately for \texttt{g-} and \texttt{c-} blocks):
-      \begin{itemize}
-        \item sum, mean, std, kurtosis, skewness
-        \item captures the overall activation level per sample
-      \end{itemize}
-      \vspace{0.8cm}
-      \textbf{Categorical encoding:}
-      \begin{itemize}
-        \item one-hot on \texttt{cp\_time} and \texttt{cp\_dose}
-        \item test columns realigned to the training reference columns
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{lstlisting}
-df["g_sum"]  = df[g_cols].sum(axis=1)
-df["g_mean"] = df[g_cols].mean(axis=1)
-df["g_std"]  = df[g_cols].std(axis=1)
-df["g_kurtosis"] = df[g_cols].kurtosis(axis=1)
-df["g_skew"] = df[g_cols].skew(axis=1)
-# ... mirrored for c_cols
-      \end{lstlisting}
-      \begin{lstlisting}
-def encode_categoricals(df, dummy_cols,
-                        reference_columns=None):
-    df = pd.get_dummies(df, columns=dummy_cols,
-                        dtype=np.float64)
-    if reference_columns is not None:
-        df = df.reindex(columns=reference_columns,
-                        fill_value=0)
-    return df
-      \end{lstlisting}
     \end{column}
   \end{columns}
 \end{frame}
@@ -391,6 +408,7 @@ def encode_categoricals(df, dummy_cols,
         \item A learnable \textbf{[CLS]} token is prepended
         \item \textbf{Self-attention} (thin lines) connects every token to every other
         \item The CLS output summarises the row $\to$ classification head
+        \item Token size 64, 2 blocks, 4 heads, dropout 0.2
         \item $O(L^2)$ cost $\Rightarrow$ smaller batch size (64)
         \item Consumes \textbf{raw RankGauss} features (no PCA)
         \item Simplified variant of Gorishniy et al.\ (post-LayerNorm, GELU, no ReGLU)
@@ -406,7 +424,7 @@ def encode_categoricals(df, dummy_cols,
   \begin{columns}[T]
     \begin{column}{0.58\textwidth}
       \centering
-      \begin{tikzpicture}[scale=0.92, transform shape]
+      \begin{tikzpicture}[scale=0.88, transform shape]
         \node[tree] (t1) at (0,0) {Tree 1};
         \node[layer, right=7mm of t1, font=\tiny] (r1) {residual};
         \node[tree, right=7mm of r1] (t2) {Tree 2};
@@ -432,34 +450,35 @@ def encode_categoricals(df, dummy_cols,
       \begin{itemize}
         \item \textbf{Gradient boosting}: each tree corrects the residual error of the previous ones
         \item A single multi-output \texttt{MultiLogloss} fit, not 206 separate fits
+        \item 250 symmetric trees of depth 5, learning rate 0.08
         \item Splits stay aligned to the original features $\to$ trained on \textbf{raw RankGauss} (no PCA)
-        \item Fixed 250 iterations (no early stopping), one fit per fold, no seed bagging
-        \item Targets constant within a fold are excluded from the fit and filled with the observed constant
+        \item Fixed iterations, one fit per fold, no seed bagging
+        \item Targets constant within a fold are excluded from the fit and predicted with a \textbf{smoothed prior} (0.5 pseudo-counts) instead of 0
       \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
 
-\section{Training}
+\section{Training and Validation}
 
 % ---------------------------------------------------------------
 % METRIC, LOSS, TRAINING ROUTINE
 % ---------------------------------------------------------------
-\begin{frame}{Metric, Loss Variants and Training Routine}
+\begin{frame}{Metric, Loss and Training Routine}
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
       \textbf{Evaluation metric}
+      {\small
       \[
         \mathcal{L} = -\frac{1}{N \cdot 206}\sum_{i=1}^{N}\sum_{j=1}^{206}
         \Big[y_{ij}\log \hat y_{ij} + (1-y_{ij})\log(1-\hat y_{ij})\Big]
-      \]
+      \]}
       predictions clipped to $[\epsilon, 1-\epsilon]$, with $\epsilon = 10^{-15}$, computed in float64.
       \\
       \vspace{4mm}
-      \textbf{Optional variants (training loss only)}
+      \textbf{Training loss}
       \begin{itemize}
-        \item \textbf{Focal loss:} down-weights easy examples (off by default)
-        \item \textbf{Label smoothing} (0.001): $y(1-\epsilon) + 0.5\epsilon$
+        \item \texttt{BCEWithLogitsLoss} with \textbf{label smoothing} (0.001): $y(1-\epsilon) + 0.5\epsilon$
         \item Model selection \textbf{always} uses the plain, non-smoothed log loss
       \end{itemize}
     \end{column}
@@ -485,7 +504,7 @@ def encode_categoricals(df, dummy_cols,
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
       \begin{block}{Outer loop: 5-fold OOF}
-        \texttt{MultilabelStratifiedKFold}, seed 42. Each fold's validation part yields the out-of-fold predictions and is scored \textbf{once}, after training.
+        \texttt{MultilabelStratifiedKFold}, seed 42, on treated rows. Each fold's validation part yields the out-of-fold predictions and is scored \textbf{once}, after training.
       \end{block}
       \begin{block}{Inner split: model selection}
         10\% of each training fold (stratified) drives early stopping, LR scheduling and best-epoch choice of the neural networks. CatBoost uses fixed iterations.
@@ -495,34 +514,12 @@ def encode_categoricals(df, dummy_cols,
       \begin{block}{Blend: nested CV}
         Weights are fitted on $k-1$ folds' OOF predictions and scored on the held-out fold.
       \end{block}
-      \begin{alertblock}{Known limitation}
-        The data has no drug identifier, so the CV cannot be grouped by compound: the same compound may appear in training and validation. Scores can be optimistic compared with the leaderboard.
+      \begin{alertblock}{Known limitations}
+        No drug identifier: the CV cannot be grouped by compound, so the same compound may appear in training and validation. Design choices were also made by looking at these same folds. Scores are optimistic (see the Kaggle test-set slide).
       \end{alertblock}
     \end{column}
   \end{columns}
 \end{frame}
-
-% ---------------------------------------------------------------
-% PREPROCESSING
-% ---------------------------------------------------------------
-\begin{frame}{Two Preprocessing Pipelines}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \begin{block}{PCA variant (ResNet)}
-        VarianceThreshold $\to$ RankGauss (\texttt{QuantileTransformer}) $\to$ PCA(50) on \texttt{g-}, PCA(15) on \texttt{c-} $\to$ \textbf{concatenate} transformed features, PCA components and raw dummies ($\approx$950 columns)
-      \end{block}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{block}{Raw variant (FT-Transformer, CatBoost)}
-        VarianceThreshold $\to$ RankGauss, \textbf{no PCA} -- keeps one token/split per original feature ($\approx$890 columns)
-      \end{block}
-    \end{column}
-  \end{columns}
-  \vspace{2mm}
-  \small Both fitted \textbf{per fold} on the training split only and cached to disk as \texttt{.joblib}. The raw pipeline fitted for the transformer is reused by CatBoost within the same run; stale caches are cleared at the start of each run.
-\end{frame}
-
-\section{Cross-Validation \& Ensembling}
 
 % ---------------------------------------------------------------
 % NN CV AT SCALE
@@ -535,7 +532,7 @@ def encode_categoricals(df, dummy_cols,
         \item \texttt{joblib} + \texttt{loky} backend, GPUs assigned \textbf{round-robin}
         \item 2 GPUs $\times$ 2 jobs/GPU $=$ \textbf{4 parallel workers}
         \item Predictions averaged over the 3 seeds per (fold, model)
-        \item Wall-clock: NN CV 96.3 min, CatBoost CV 29.7 min, inference 0.5 min
+        \item Wall-clock: NN CV 98.5 min, CatBoost CV 29.1 min, inference 0.5 min (total 131 min)
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
@@ -553,146 +550,158 @@ Parallel(n_jobs=N_JOBS_NN,
   \end{columns}
 \end{frame}
 
+\section{Ensembling}
+
 % ---------------------------------------------------------------
-% BLENDING METHODOLOGY
+% BLENDING: METHOD + NESTED RESULTS
 % ---------------------------------------------------------------
-\begin{frame}{Ensemble Blending: Methodology}
+\begin{frame}{Ensemble Blending: Method and Nested-CV Results}
   \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
+    \begin{column}{0.46\textwidth}
+      \footnotesize
       \textbf{Weight search}
       \begin{itemize}
         \item Softmax-reparameterised weights on the simplex
         \item \textbf{Nelder--Mead}, not SLSQP: avoids a zero finite-difference gradient stalling the optimiser at $x_0$
       \end{itemize}
-    \end{column}
-    \begin{column}{0.5\textwidth}
       \textbf{Nested CV}
       \begin{itemize}
-        \item Weights fit on $k-1$ folds, scored on the held-out fold
-        \item Prevents an over-optimistic blend score
-        \item Final weights = mean across folds
+        \item Weights fit on $k-1$ folds, scored on the held-out fold; final weights = mean across folds
+        \item In-sample score (weights fit on all OOF rows): 0.01605, equal to the nested one; gap $9.4\cdot10^{-7}$. The blending step is not optimistic with three weights; this says nothing about leakage from the CV design
       \end{itemize}
     \end{column}
+    \begin{column}{0.54\textwidth}
+      \centering
+      {\small\bfseries Score and weights per held-out fold}\\[1mm]
+      \small
+      \begin{tabular}{@{}ccccc@{}}
+        \toprule
+        \textbf{Fold} & \textbf{Score} & $w_{\text{resnet}}$ & $w_{\text{ft}}$ & $w_{\text{cb}}$ \\
+        \midrule
+        0 & 0.01603 & 0.431 & 0.391 & 0.177 \\
+        1 & 0.01618 & 0.447 & 0.383 & 0.170 \\
+        2 & 0.01570 & 0.424 & 0.387 & 0.188 \\
+        3 & 0.01611 & 0.430 & 0.385 & 0.185 \\
+        4 & 0.01623 & 0.445 & 0.388 & 0.166 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
   \end{columns}
-  \begin{exampleblock}{Two scores reported}
-    \emph{naive} OOF blend score (same data used to fit the weights) vs.\ \emph{honest} nested-CV score
-  \end{exampleblock}
+  \vspace{1mm}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Final weights (mean across folds)}
+        \small
+        ResNet 43.6\% \textbar\ FT-Transformer 38.7\% \textbar\ CatBoost 17.7\%
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{Honest nested-blend score}
+        \small $0.01605 \pm 0.00019$
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 \section{Results}
 
 % ---------------------------------------------------------------
-% RESULTS: FOLD BY FOLD
+% RESULTS: FOLD BY FOLD + OOF
 % ---------------------------------------------------------------
-\begin{frame}{Results -- Fold-by-Fold Validation Loss}
-  \centering
-  \begin{tabular}{@{}cccc@{}}
-    \toprule
-    \textbf{Fold} & \textbf{ResNet} & \textbf{FT-Transformer} & \textbf{CatBoost} \\
-    \midrule
-    0 & 0.01686 & 0.01693 & 0.01707 \\
-    1 & 0.01705 & 0.01710 & 0.01709$^{*}$ \\
-    2 & 0.01652 & 0.01656 & 0.01676 \\
-    3 & 0.01679 & 0.01688 & 0.01704$^{*}$ \\
-    4 & 0.01700 & 0.01705 & 0.01704 \\
-    \midrule
-    \textbf{Mean} & 0.01684 & 0.01690 & 0.01700 \\
-    \bottomrule
-  \end{tabular}
-  \vspace{2mm}
-
-  \small $^{*}$ 1 constant target in the training fold, excluded from the CatBoost fit and filled with the observed constant.
-  \vspace{2mm}
-
-  \small Network values are the \emph{mean of the per-seed losses}; CatBoost is trained once per fold. The OOF scores on the next slide use \emph{seed-averaged predictions}, which lowers the loss by about 0.0005 (bagging gain). ResNet is the best network in every fold.
-\end{frame}
-
-% ---------------------------------------------------------------
-% RESULTS: OOF SUMMARY + CHART
-% ---------------------------------------------------------------
-\begin{frame}{Results -- Out-of-Fold Summary}
+\begin{frame}{Results -- Cross-Validation}
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.5\textwidth}
       \centering
-      \begin{tabular}{@{}lc@{}}
+      {\small\bfseries Validation loss per fold}\\[1mm]
+      \small
+      \begin{tabular}{@{}cccc@{}}
         \toprule
-        \textbf{Model} & \textbf{OOF log loss} \\
+        \textbf{Fold} & \textbf{ResNet} & \textbf{FT-Tr.} & \textbf{CatBoost} \\
         \midrule
-        ResNet & \textbf{0.01632} \\
-        FT-Transformer & 0.01643 \\
-        CatBoost & 0.01700 \\
+        0 & 0.01686 & 0.01695 & 0.01707 \\
+        1 & 0.01705 & 0.01711 & 0.01707$^{*}$ \\
+        2 & 0.01652 & 0.01655 & 0.01676 \\
+        3 & 0.01679 & 0.01682 & 0.01701$^{*}$ \\
+        4 & 0.01700 & 0.01706 & 0.01704 \\
         \midrule
-        Ensemble (nested) & \textbf{0.01606} \\
+        \textbf{Mean} & 0.01684 & 0.01690 & 0.01699 \\
         \bottomrule
       \end{tabular}
-      \vspace{3mm}
 
-      \small\textbf{Timing:} NN CV 96.3 min \textbar\ CatBoost CV 29.7 min \textbar\ total 128.6 min
+      \vspace{2mm}
+      \scriptsize $^{*}$ 1 constant target in the training fold, predicted with the smoothed prior.\\
+      Network values are the \emph{mean of the per-seed losses}; CatBoost is trained once per fold. ResNet is the best model in every fold.
     \end{column}
-    \begin{column}{0.52\textwidth}
+    \begin{column}{0.5\textwidth}
       \centering
-      \begin{tikzpicture}[scale=1, every node/.style={font=\scriptsize}]
-        % baseline axis; bar length = (loss - 0.0155) * 27.5 mm per 0.001
-        \draw[primary!60] (0,3mm) -- (0,-27mm);
-        \foreach \lbl/\w/\y/\col/\val in {
-          ResNet/22.6mm/0mm/secondary!70/0.01632,
-          {FT-Transformer}/25.6mm/-7.5mm/secondary!70/0.01643,
-          CatBoost/41.3mm/-15mm/secondary!70/0.01700
-        } {
-          \node[anchor=east, text=primary] at (-1mm,\y) {\lbl};
-          \draw[fill=\col, draw=primary] (0,\y-2mm) rectangle (\w,\y+2mm);
-          \node[anchor=west, text=primary] at (\w+1mm,\y) {\val};
+      {\small\bfseries Out-of-fold log loss (seed-averaged)}\\[1mm]
+      \begin{tikzpicture}[scale=0.95, transform shape, every node/.style={font=\scriptsize}]
+        % dot plot: x = (loss - 0.0160) * 60000 mm
+        \draw[primary!60] (0,-23mm) -- (66mm,-23mm);
+        \foreach \v/\lab in {0/0.0160, 30/0.0165, 60/0.0170} {
+          \draw[primary!60] (\v mm,-23mm) -- (\v mm,-24mm);
+          \node[anchor=north, text=primary] at (\v mm,-24mm) {\lab};
         }
-        \draw[primary!40, dashed] (-22mm,-19.5mm) -- (50mm,-19.5mm);
-        \node[anchor=east, text=primary, font=\scriptsize\bfseries] at (-1mm,-24.5mm) {Ensemble};
-        \draw[fill=accent2, draw=primary] (0,-26.5mm) rectangle (15.4mm,-22.5mm);
-        \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (16.4mm,-24.5mm) {0.01606};
-        \node[anchor=north, text=primary!70, font=\tiny] at (20mm,-28mm) {OOF log loss (lower is better) -- axis starts at 0.0155};
+        \draw[primary!15, dashed] (3mm,0) -- (3mm,-23mm);
+        \fill[accent2] (3mm,0) circle (1.6mm);
+        \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (5.5mm,0) {Ensemble (nested) 0.01605};
+        \fill[secondary] (19.2mm,-6mm) circle (1.4mm);
+        \node[anchor=west, text=primary] at (21.5mm,-6mm) {ResNet 0.01632};
+        \fill[secondary] (25.2mm,-12mm) circle (1.4mm);
+        \node[anchor=west, text=primary] at (27.5mm,-12mm) {FT-Transformer 0.01642};
+        \fill[secondary] (59.4mm,-18mm) circle (1.4mm);
+        \node[anchor=east, text=primary] at (57mm,-18mm) {CatBoost 0.01699};
+        \node[anchor=north, text=primary!70, font=\tiny] at (33mm,-27.5mm) {lower is better; zoomed axis, not from zero};
       \end{tikzpicture}
+
+      \vspace{2mm}
+      \scriptsize Seed-averaged predictions lower the loss by about 0.0005 per network (bagging gain). Fold standard deviation of the blend: 0.00019. Ensemble vs.\ best single model: about 1.7\% better.
     \end{column}
   \end{columns}
 \end{frame}
 
 % ---------------------------------------------------------------
-% RESULTS: NESTED BLEND
+% RESULTS: KAGGLE TEST SET
 % ---------------------------------------------------------------
-\begin{frame}{Results -- Ensemble Blend (Nested CV)}
-  \centering
-  {\large\bfseries Score and weights per held-out fold}\\[1mm]
-  \begin{tabular}{@{}ccccc@{}}
-    \toprule
-    \textbf{Fold} & \textbf{Score} & $w_{\text{resnet}}$ & $w_{\text{ft}}$ & $w_{\text{cb}}$ \\
-    \midrule
-    0 & 0.01603 & 0.447 & 0.374 & 0.179 \\
-    1 & 0.01618 & 0.460 & 0.369 & 0.170 \\
-    2 & 0.01570 & 0.437 & 0.373 & 0.190 \\
-    3 & 0.01617 & 0.428 & 0.389 & 0.183 \\
-    4 & 0.01622 & 0.465 & 0.370 & 0.166 \\
-    \bottomrule
-  \end{tabular}
-
-  \vspace{0.4cm}
-
+\begin{frame}{Independent Check: Kaggle Test Set}
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \begin{block}{Final weights (mean across folds)}
-        \small
-        ResNet 44.7\% \textbar\ FT-Transformer 37.5\% \textbar\ CatBoost 17.8\%
-      \end{block}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \small
+      \begin{tabular}{@{}lc@{}}
+        \toprule
+        \textbf{Estimate} & \textbf{Log loss} \\
+        \midrule
+        Nested CV, treated rows only & 0.01605 $\pm$ 0.00019 \\
+        Rescaled to all rows ($\times$ 0.910) & 0.01461 \\
+        \textbf{Kaggle private} & \textbf{0.01634} (+11.8\%) \\
+        Kaggle public & 0.01864 (+27.6\%) \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{2mm}
+      \scriptsize CV scores use treated rows only. Control rows are predicted 0 (true 0) and add almost no loss, so the all-rows score $\approx$ treated-only score $\times$ treated share (0.910 in the public test set). Percentages are relative to the rescaled estimate.
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \begin{exampleblock}{Honest nested-blend score}
-        $0.01606 \pm 0.00019$
-      \end{exampleblock}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item \textbf{Late submission} through a separate \textbf{inference notebook}: loads 30 checkpoints, 5 CatBoost models, 10 fold pipelines and the blend weights; no training, no internet
+        \item Predictions match the training notebook's (max.\ abs.\ difference $1.1\cdot10^{-16}$)
+        \item Submitted \textbf{once}; the test set was never used for tuning
+      \end{itemize}
     \end{column}
   \end{columns}
-
-  \vspace{1mm}
-  \small Naive OOF blend (0.01606) equals the nested score. With only three weights this is expected; it does not rule out leakage from the CV design (no grouping by compound).
+  \vspace{2mm}
+  \begin{alertblock}{The CV estimate is optimistic}
+    \small The private score is 11.8\% above the rescaled CV estimate. A likely cause is the missing grouping by compound (same compound in training and validation, different compounds in the test set) -- \textbf{not tested}. Public and private differ by 0.0023, over ten times the fold standard deviation: the fold std understates the uncertainty on unseen data.
+  \end{alertblock}
 \end{frame}
 
+% ---------------------------------------------------------------
+% ABLATION
+% ---------------------------------------------------------------
 \begin{frame}{Ablation -- Is an Extra Network Worth It?}
   \centering
+  \small
   \begin{tabular}{@{}lccc@{}}
     \toprule
     \textbf{Base: ResNet + FT + CatBoost} & \textbf{Extra OOF} & \textbf{Ensemble (nested)} & \textbf{Extra weight} \\
@@ -700,15 +709,16 @@ Parallel(n_jobs=N_JOBS_NN,
     + MLP (PCA features) & 0.01649 & 0.01604 & 1.5\% \\
     + 1D-CNN (PCA features) & 0.01661 & 0.01605 & 8.2\% \\
     + 1D-CNN (raw features) & 0.01661 & 0.01606 & 7.0\% \\
-    \textbf{no extra network (final)} & -- & \textbf{0.01606} & -- \\
+    no extra network (baseline at the time) & -- & 0.01606 & -- \\
+    \textbf{no extra network (final rerun)} & -- & \textbf{0.01605} & -- \\
     \bottomrule
   \end{tabular}
-  \vspace{4mm}
+  \vspace{3mm}
 
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{Reading}
-        \small All four ensembles score 0.01604--0.01606: the differences ($\le 2\cdot10^{-5}$) are below the fold standard deviation (0.00018) and the run-to-run GPU noise ($\approx 10^{-5}$).
+        \small All ensembles score 0.01604--0.01606: the differences ($\le 2\cdot10^{-5}$) are below the fold standard deviation (0.00019) and the run-to-run GPU noise ($\approx 10^{-5}$). The ablation ran on an earlier code revision.
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -730,22 +740,24 @@ Parallel(n_jobs=N_JOBS_NN,
     \begin{column}{0.5\textwidth}
       \textbf{Findings}
       \begin{itemize}
-        \item Ensemble 0.01606 vs.\ best single model (ResNet) 0.01632: $\approx$1.6\% better
+        \item Ensemble 0.01605 vs.\ best single model (ResNet) 0.01632: $\approx$1.7\% better
         \item ResNet and FT-Transformer carry $\approx$82\% of the weight; CatBoost, weakest alone, gets 18\%
-        \item An extra network (MLP or 1D-CNN, on PCA or raw features) does not improve the blend
+        \item An extra network (MLP or 1D-CNN) does not improve the blend
+        \item Kaggle test set: private 0.01634, public 0.01864, against a rescaled CV estimate of 0.01461
       \end{itemize}
       \textbf{Future work}
       \begin{itemize}
-        \item Group the CV by compound; measure the leaderboard score
+        \item Group the CV by compound, or reserve a hold-out before tuning
         \item Ablations: PCA vs.\ raw for the ResNet, error correlation between models
       \end{itemize}
     \end{column}
     \begin{column}{0.5\textwidth}
       \textbf{Limitations}
       \begin{itemize}
-        \item No compound identifier: possible leakage across folds, optimistic scores
-        \item The inner split removes 10\% of the training data; an earlier protocol that selected epochs on the OOF fold gave 0.01595, so about 0.0001 of that gap was optimism
-        \item GPU non-determinism: repeated runs differ by $\approx 10^{-5}$; wall-clock time varied by about 20\% across runs
+        \item No compound identifier: possible leakage across folds; the CV estimate is optimistic (confirmed by the Kaggle gap, cause not tested)
+        \item Design choices made on the same folds that are reported; no hold-out reserved before tuning
+        \item The inner split removes 10\% of the training data; an earlier protocol that selected epochs on the OOF fold gave 0.01595, a difference consistent with selection optimism but mixed with the data loss and noise
+        \item GPU non-determinism: repeated runs differ by $\approx 10^{-5}$
         \item Why CatBoost earns weight (diverse errors) was not measured
       \end{itemize}
     \end{column}
@@ -766,7 +778,7 @@ Parallel(n_jobs=N_JOBS_NN,
     \item Paszke et al., \emph{PyTorch}, NeurIPS 2019; Pedregosa et al., \emph{Scikit-learn}, JMLR 12, 2011.
     \item Loshchilov, Hutter, \emph{Decoupled Weight Decay Regularization} (AdamW), ICLR 2019.
     \item Micikevicius et al., \emph{Mixed Precision Training}, ICLR 2018.
-    \item Lin et al., \emph{Focal Loss for Dense Object Detection}, ICCV 2017; Szegedy et al., \emph{Rethinking the Inception Architecture} (label smoothing), CVPR 2016.
+    \item Szegedy et al., \emph{Rethinking the Inception Architecture for Computer Vision} (label smoothing), CVPR 2016.
     \item Nelder, Mead, \emph{A simplex method for function minimization}, The Computer Journal 7(4), 1965.
   \end{itemize}
 \end{frame}
