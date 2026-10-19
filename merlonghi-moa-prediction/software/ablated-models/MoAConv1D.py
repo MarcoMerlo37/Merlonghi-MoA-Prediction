@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 
 class MoAConv1D(nn.Module):
     """1D convolutional network for tabular data.

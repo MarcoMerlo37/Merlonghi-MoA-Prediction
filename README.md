@@ -60,7 +60,7 @@ Out-of-fold (OOF) mean log loss over the 5 folds, treated rows only (lower is be
 | CatBoost | 0.01699 |
 | **Ensemble (nested, honest estimate)** | **0.01607 ± 0.00017** |
 
-Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. They agree to five decimals (0.01607); the difference is 1.58e-6, which measures the optimism of the blending step. With only three weights to fit it is negligible. This agreement says nothing about leakage from the CV design itself (see Limitations).
+Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. The in-sample score is 0.01606 and the nested score is 0.01607; the difference is 1.58e-6, which measures the optimism of the blending step. With only three weights to fit it is negligible. This says nothing about leakage from the CV design itself (see Limitations).
 The *nested* score is 27.6% lower than the *baseline* OOF log loss value.
 
 Final blend weights (averaged across the nested-CV folds):
@@ -71,18 +71,29 @@ Final blend weights (averaged across the nested-CV folds):
 | FT-Transformer | 0.3746 |
 | CatBoost | 0.1725 |
 
-The ensemble is about 1.5% better than the best single model (ResNet). TabularResNet and FT-Transformer carry about 83% of the weight. CatBoost, despite the weakest standalone score, still earns 17% of it; a plausible reason is that tree-based errors differ from the networks', in fact a blend without CatBoost the OOF log loss value would increase to 0.01612, with a standard deviation of 0.00018.
-The following table shows the results excluding one of the three models:
+The ensemble is about 1.5% better than the best single model (ResNet). TabularResNet and FT-Transformer carry about 83% of the weight. CatBoost, despite the weakest standalone score, still earns 17% of it. Two measurements support its contribution:
 
-| Model excluded | OOF log loss | Weights |
+- **Different errors.** The correlation between the models' residuals (OOF prediction minus label, Step 15.3) is lower for CatBoost than between the two networks, especially on the positive cells:
+
+| Model pair | All cells | Positive cells |
 |---|---|---|
-| ResNet | 0.01624 ± 0.00013 | [FT-Transformer: 0.6789, CatBoost: 0.3211] |
-| FT-Transformer | 0.01619 ± 0.00019 | [ResNet: 0.714, CatBoost: 0.286] |
-| ResNet | 0.01612 ± 0.00018 | [ResNet: 0.5474, FT-Transformer: 0.4526] |
+| ResNet – FT-Transformer | 0.987 | 0.977 |
+| ResNet – CatBoost | 0.973 | 0.930 |
+| FT-Transformer – CatBoost | 0.972 | 0.928 |
+
+- **Drop-one blends.** Each row is the nested-CV blend of the two remaining models (Step 15.3):
+
+| Model excluded | OOF log loss | Difference vs. full blend (0.01607) | Weights |
+|---|---|---|---|
+| ResNet | 0.01624 ± 0.00013 | +0.00017 | FT-Transformer 0.6789, CatBoost 0.3211 |
+| FT-Transformer | 0.01619 ± 0.00019 | +0.00012 | ResNet 0.714, CatBoost 0.286 |
+| CatBoost | 0.01612 ± 0.00018 | +0.00005 | ResNet 0.5474, FT-Transformer 0.4526 |
+
+The gain from CatBoost is small, but it is consistent: removing it worsens the nested score in all five folds (by 6, 7, 3, 1 and 8 × 10⁻⁵, from the per-fold scores printed in Step 14.5 and Step 15.3). The standard deviation across folds is not the right yardstick for this comparison, because the folds are the same for both blends.
 
 Per-fold scores in the notebook output are the mean of the per-seed losses; they are higher than the OOF scores, which use seed-averaged predictions (bagging gain of about 0.0005 per network).
 
-A full training run (5 folds × 2 networks × 3 seeds, plus the CatBoost CV) took about 130 minutes on a Kaggle notebook with 2× NVIDIA T4 (95 min neural-network CV, 29 min CatBoost CV, under 1 min test-set inference). Wall-clock time is noisy on the platform: the ablation configurations below, which train more jobs, finished in 106–113 minutes.
+A full training run (5 folds × 2 networks × 3 seeds, plus the CatBoost CV) took about 130 minutes on a Kaggle notebook with 2× NVIDIA T4: 128 min for the main pipeline as printed by the notebook (96.6 min neural-network CV, 28.7 min CatBoost CV, 0.5 min test-set inference, the rest being blending and logging) and 131 min for the whole notebook including the final checks. Wall-clock time is noisy on the platform: the ablation configurations below, which train more jobs, finished in 106–113 minutes.
 
 ### Independent check on the Kaggle test set
 
@@ -111,7 +122,11 @@ Three configurations with a fourth model were also run on the same folds. The ba
 | No extra network (baseline at the time of the ablation) | – | 0.01606 | – | 129 min |
 | **No extra network (final rerun)** | – | **0.01605** | – | 131 min |
 
-The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. The code of the MLP and 1D-CNN is part of this repository, and can be found in this folder: [`software/ablated-models/`](software/ablated-models/).
+The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. 
+
+The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](software/ablated-models/) (see the README of that folder for how to plug them into the training notebook). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
+
+The "differences below the fold standard deviation" argument is unpaired. The per-fold scores of the ablation runs were not kept, so a paired comparison (as done above for CatBoost) was not possible; the conclusion therefore rests on the differences being of the same order as the run-to-run noise.
 
 ### Protocol note
 
@@ -119,7 +134,7 @@ An earlier version of the code selected the best epoch on the same fold that pro
 
 ### Leaderboard
 
-The results achieved would rank approximately 1400th of 4,373 in the private leaderboard and 1800th in the public one. Late submission do not occur in the leaderboards, so this is only an approximation based on the Kaggle rankings for this competition.
+The results would rank approximately 1400th of 4,373 in the private leaderboard and 1800th in the public one. Late submissions do not appear on the leaderboards, so this is an approximation obtained by comparing the scores with the final rankings of the competition ([source, date accessed]).
 
 ## Limitations
 
@@ -129,8 +144,8 @@ The results achieved would rank approximately 1400th of 4,373 in the private lea
 - **CV on treated rows only.** CV scores are comparable with leaderboard scores only after rescaling by the treated share (see above).
 - **One submission, noisy test subsets.** The Kaggle score comes from a single submission. Public and private scores differ by 0.0023, more than ten times the fold standard deviation, so the fold standard deviation understates the uncertainty on unseen data. Late submissions do not appear on the leaderboard.
 - **Non-determinism.** Repeated GPU runs differ by about 1e-5 in OOF log loss.
-- **No ablation** of individual design choices (PCA vs. raw features, label smoothing) was run.
-- **Mixed precision** in validation, full precision at test time. Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the OOF log loss differs by 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) between the two modes (Step 15.1), against an ensemble gain of about 3e-4.
+- **No ablation** of individual design choices (PCA vs. raw features for the ResNet, label smoothing) was run. The only raw-vs-PCA comparison concerns the 1D-CNN of the extra-network ablation.
+- **Mixed precision in validation, full precision at test time.** Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the two modes differ by at most 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) in predicted probability, but the log loss is identical to six decimals (0.016815 vs. 0.016815 and 0.016856 vs. 0.016856, Step 15.1). The effect on the blend weights was not measured separately.
 - **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see `software/README.md`).
 
 ## Repository structure
@@ -144,10 +159,14 @@ merlonghi-moa-prediction/
 │     ├── moa-training.pdf                <- landscape export of the training notebook
 │     ├── moa-inference.ipynb             <- inference and Kaggle submission
 │     ├── moa-inference.pdf               <- landscape export of the inference notebook
-│     └── requirements.txt                <- python packages to install
+│     ├── requirements.txt                <- python packages to install
+│     ├── requirements-frozen.txt         <- versions of the reported training run
+│     └── ablated-models/
+│           ├── MoAMLP.py                 <- MLP of the extra-network ablation
+│           └── MoAConv1D.py              <- 1D-CNN of the extra-network ablation
 └── doc/
-      ├── moa_presentation.pdf
-      └── moa_presentation.tex            <- latex beamer
+      ├── moa-presentation.pdf
+      └── moa-presentation.tex            <- latex beamer
 ```
 
 ## References

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 
 class MoAMLP(nn.Module):
     name = "mlp"

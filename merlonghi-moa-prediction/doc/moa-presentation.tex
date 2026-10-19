@@ -171,7 +171,7 @@
     \end{column}
     \begin{column}{0.45\textwidth}
       \begin{block}{Why an ensemble?}
-        Blending different model families (dense net, attention, trees) fed with different preprocessing is a standard way to reduce variance. The blend gain is measured in this project; whether the models' errors really differ was \textbf{not} measured.
+        Blending different model families (dense net, attention, trees) fed with different preprocessing is a standard way to reduce variance. In this project, both the blending gain and the diversity of the models' errors were evaluated.
       \end{block}
     \end{column}
   \end{columns}
@@ -591,7 +591,7 @@ Parallel(n_jobs=N_JOBS_NN,
     \begin{column}{0.48\textwidth}
       \begin{block}{Final weights (mean across folds)}
         \small
-        ResNet 45.29\% \textbar\ FT-Transformer 37,46\% \textbar\ CatBoost 17.25\%
+        ResNet 45.29\% \textbar\ FT-Transformer 37.46\% \textbar\ CatBoost 17.25\%
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -646,7 +646,7 @@ Parallel(n_jobs=N_JOBS_NN,
         \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (5.5mm,0) {Ensemble (nested) 0.01607};
         \fill[secondary] (19.2mm,-6mm) circle (1.4mm);
         \node[anchor=west, text=primary] at (21.5mm,-6mm) {ResNet 0.01632};
-        \fill[secondary] (25.2mm,-12mm) circle (1.4mm);
+        \fill[secondary] (25.8mm,-12mm) circle (1.4mm);
         \node[anchor=west, text=primary] at (27.5mm,-12mm) {FT-Transformer 0.01643};
         \fill[secondary] (59.4mm,-18mm) circle (1.4mm);
         \node[anchor=east, text=primary] at (57mm,-18mm) {CatBoost 0.01699};
@@ -654,7 +654,7 @@ Parallel(n_jobs=N_JOBS_NN,
       \end{tikzpicture}
 
       \vspace{2mm}
-      \scriptsize Seed-averaged predictions lower the loss by about 0.0005 per network (bagging gain). Fold standard deviation of the blend: 0.00017. Ensemble vs.\ best single model: about 1.6\% better.
+      \scriptsize Seed-averaged predictions lower the loss by about 0.0005 per network (bagging gain). Fold standard deviation of the blend: 0.00017. Ensemble vs.\ best single model: about 1.5\% better.
     \end{column}
   \end{columns}
 \end{frame}
@@ -746,7 +746,7 @@ Parallel(n_jobs=N_JOBS_NN,
       \textbf{Future work}
       \begin{itemize}
         \item Group the CV by compound, or reserve a hold-out before tuning
-        \item Ablations: PCA vs.\ raw for the ResNet, error correlation between models
+        \item Ablations: PCA vs.\ raw for the ResNet
       \end{itemize}
     \end{column}
     \begin{column}{0.5\textwidth}

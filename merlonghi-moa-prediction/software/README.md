@@ -23,7 +23,7 @@ Both notebooks were authored and executed **on Kaggle**, inside Kaggle Notebooks
 - **Python / image:** Kaggle's standard `python` Docker image (with `numpy`, `pandas`, `torch`, `scikit-learn`, etc. pre-installed). The training run used Python 3.12.
 - **Data mount:** the competition data is attached as a Kaggle competition source and appears already extracted under `/kaggle/input/competitions/lish-moa`. This path depends on the platform version: if it differs, check `/kaggle/input` in a cell and edit `DATA_DIR` in the training notebook. The inference notebook finds its input folders by file name and needs no path edits.
 - **Working directory:** intermediate artefacts (model checkpoints, fold preprocessing pipelines, experiment logs, the final `submission.csv`) are written to `/kaggle/working`, which Kaggle persists as the notebook's output.
-- **Runtime (training):** a full run (5-fold × 2 networks × 3 seeds, plus the CatBoost CV) took about **130 minutes** wall-clock on the two T4s (≈95 min neural-network CV, ≈29 min CatBoost CV, <1 min test-set inference). Timing varies with the platform machine: expect roughly ±20%.
+- **Runtime (training):** a full run (5-fold × 2 networks × 3 seeds, plus the CatBoost CV) took about **130 minutes** wall-clock on the two T4s (≈97 min neural-network CV, ≈29 min CatBoost CV, <1 min test-set inference). Timing varies with the platform machine: expect roughly ±20%.
 - **Internet access:** the only network call in the training notebook is `!pip install -q iterative-stratification` in the first code cell, so the "Internet" toggle must be **on** for that session. The inference notebook makes no network call and runs with internet **off**.
 
 Running **on Kaggle** (Option A below) is the path closest to how the notebooks were built and validated. The training notebook can also be run **locally** (Option B): only `DATA_DIR` and `WORK_DIR` need to point elsewhere, and a GPU must be provided by the local machine.
@@ -41,7 +41,7 @@ The trained artifacts used by the inference notebook are not included either; th
 
 - Python 3.12 (training) and 3.13 (inference).
 - A CUDA-capable GPU is strongly recommended. Without one, training time for the full multi-seed, multi-model cross-validation would be prohibitively long.
-- Packages (see [`requirements.txt`](requirements.txt)): `numpy`, `pandas`, `scipy`, `joblib`, `scikit-learn`, `torch`, `iterative-stratification`, `catboost`, `matplotlib` (exploratory plots). `requirements.txt` lists the packages without versions. `requirements-frozen.txt` pins the versions of the Kaggle environment of the reported run.
+- Packages (see [`requirements.txt`](requirements.txt)): `numpy`, `pandas`, `scipy`, `joblib`, `scikit-learn`, `torch`, `iterative-stratification`, `catboost`, `matplotlib` (exploratory plots). `requirements.txt` lists the packages without versions; [`requirements-frozen.txt`](requirements-frozen.txt) pins the versions of the Kaggle environment of the reported run (written by Step 14.9 of the training notebook; Python itself is not included: 3.12 for training). For a faithful rerun, install from the frozen file. `scikit-learn` and `catboost` matter most: the fold pipelines are `scikit-learn` pickles and the CatBoost models are saved in its own format (reported run: `scikit-learn==1.6.1`, `catboost==1.2.10`).
 - The inference notebook needs the same libraries, minus `iterative-stratification`. The fold preprocessing pipelines are `scikit-learn` pickles, so the installed `scikit-learn` version should match the one used for training. Step 9.1 of the inference notebook prints the installed versions.
 
 ---
@@ -129,7 +129,7 @@ Mixed precision and parallel GPU jobs make runs non-deterministic: expect differ
 
 ### 8.1 What it does
 
-[`moa-inference.ipynb`](moa-inference.ipynb) rebuilds the networks, loads the saved weights, fitted preprocessing pipelines and blend weights, and predicts the test set. It reuses the training code for the feature engineering, the architectures, the pipelines (transform only), the inference and the submission checks, with just few differences. It takes about a minute on a GPU, needs no internet, and writes `/kaggle/working/submission.csv`. It never writes to the artifacts folder, which is read-only on Kaggle.
+[`moa-inference.ipynb`](moa-inference.ipynb) rebuilds the networks, loads the saved weights, fitted preprocessing pipelines and blend weights, and predicts the test set. It reuses the training code for the feature engineering, the architectures, the pipelines (transform only), the inference and the submission checks, with three differences: the pipeline and CatBoost functions read from `ARTIFACT_DIR` instead of `WORK_DIR`; `sanity_check_submission` also accepts a test set without control rows; all training-only code is removed. It takes about a minute on a GPU, needs no internet, and writes `/kaggle/working/submission.csv`. It never writes to the artifacts folder, which is read-only on Kaggle.
 
 ### 8.2 Create the Dataset of artifacts
 
@@ -149,7 +149,7 @@ The Dataset used for the reported submission is private to the author's account:
 1. Create a new Kaggle notebook and import [`moa-inference.ipynb`](moa-inference.ipynb).
 2. **Add Input**: the competition `lish-moa` and the Dataset `moa-artifacts`.
 3. Set **Internet: Off**. Select a GPU accelerator (a CPU-only run works but the FT-Transformer is slow).
-4. Run all cells. The notebook locates the two input folders by file name (`metadata.json` and `test_features.csv`), so no path needs editing. If it does not find exactly one folder for a file, it stops with an explicit message.
+4. Run all cells. The notebook locates the two input folders by file name (`metadata.json` and `test_features.csv`), so no path needs editing. If it does not find exactly one folder for a file, it stops with an explicit message. Step 2.3 compares the installed library versions with those recorded in `metadata.json`. The Kaggle image used for inference may differ from the training one in `python`, `torch` and `numpy` (reported run: Python 3.13 vs. 3.12, `torch` 2.11 vs. 2.10, `numpy` 2.1 vs. 2.0); this is expected and was checked (maximum difference 1.1e-16, section 8.4). A warning is printed only if `scikit-learn` or `catboost` differ, because those two decide whether the pickled pipelines and the CatBoost models load correctly.
 5. Step 9.1 checks that the 50 files listed above exist (check_artifacts); metadata.json, the 51st, is read in Step 2.1. Step 9.5 runs the sanity checks and writes `submission.csv`.
 
 ### 8.4 Consistency check
@@ -175,7 +175,21 @@ The private score is 11.8% above the rescaled CV estimate, so the cross-validate
 
 ---
 
-## 9. Notes
+## 9. Ablated models (`ablated-models/`)
+
+[`ablated-models/`](ablated-models/) contains the two extra networks tried in the ablation of the main [`README.md`](../README.md): `MoAMLP.py` (name `"mlp"`, three hidden layers 1024-1024-512) and `MoAConv1D.py` (name `"cnn1d"`, a dense expansion into a 256×16 pseudo-sequence followed by two 1D convolutions). They are not used by either delivered notebook, and they are not stand-alone scripts: they only define the `nn.Module`.
+
+To reproduce the ablation, copy the class into the training notebook (Step 4) and register it:
+
+```python
+MODEL_CLASSES["mlp"] = MoAMLP          # Step 9.1; MODEL_NAMES is built from this dict
+```
+
+Any model other than `ft_transformer` receives the PCA features (`_job_arrays`, Step 9.3) and the default batch size (`BATCH_SIZE`, 256). The raw-feature variant of the 1D-CNN requires changing the `key` choice in `_job_arrays`. The inference notebook ignores these models: the final blend has three components. The ablation was run on an earlier revision of the code, so its absolute values differ from the final run in the last digit.
+
+---
+
+## 10. Notes
 
 - The delivered notebooks and their PDF exports come from single clean runs (*Restart & Run All*) on Kaggle, so cells are numbered from 1.
 - The training notebook reproduces the cross-validated scores above. The Kaggle test score was measured once with the inference notebook (section 8.6). The CV is not grouped by compound (the data has no compound identifier); see the top-level README for the limitations.
