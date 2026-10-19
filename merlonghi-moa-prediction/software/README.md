@@ -6,8 +6,8 @@ This folder contains the full, runnable solution for the Kaggle **Mechanisms of 
 
 | Notebook | Purpose | PDF export |
 |---|---|---|
-| [`moa_prediction.ipynb`](moa_prediction.ipynb) | **Training**: exploratory analysis, cross-validation of three base models, nested-CV blending, saving of all trained artifacts | [`moa_notebook_landscape.pdf`](moa_notebook_landscape.pdf) |
-| [`moa_inference.ipynb`](moa_inference.ipynb) | **Inference**: loads the saved artifacts and writes the Kaggle `submission.csv`, with no training | [`moa_inference_landscape.pdf`](moa_inference_landscape.pdf) |
+| [`moa-training.ipynb`](moa-training.ipynb) | **Training**: exploratory analysis, cross-validation of three base models, nested-CV blending, saving of all trained artifacts | [`moa-training.pdf`](moa-training.pdf) |
+| [`moa-inference.ipynb`](moa-inference.ipynb) | **Inference**: loads the saved artifacts and writes the Kaggle `submission.csv`, with no training | [`moa-inference.pdf`](moa-inference.pdf) |
 
 The training notebook builds and cross-validates three base models (TabularResNet, FT-Transformer, CatBoost) on gene-expression / cell-viability profiles and blends them with a nested-CV-validated weighted ensemble. The inference notebook applies the trained models to the test set. The two are separate because the challenge is a **code competition**: a notebook is submitted and re-run by Kaggle on the hidden test set, without internet access. Retraining (about 130 minutes on 2 GPUs) is not needed for that. See the top-level [`README.md`](../README.md) for objectives, methodology and results; the slides are in [`../doc/`](../doc/).
 
@@ -23,7 +23,7 @@ Both notebooks were authored and executed **on Kaggle**, inside Kaggle Notebooks
 - **Python / image:** Kaggle's standard `python` Docker image (with `numpy`, `pandas`, `torch`, `scikit-learn`, etc. pre-installed). The training run used Python 3.12.
 - **Data mount:** the competition data is attached as a Kaggle competition source and appears already extracted under `/kaggle/input/competitions/lish-moa`. This path depends on the platform version: if it differs, check `/kaggle/input` in a cell and edit `DATA_DIR` in the training notebook. The inference notebook finds its input folders by file name and needs no path edits.
 - **Working directory:** intermediate artefacts (model checkpoints, fold preprocessing pipelines, experiment logs, the final `submission.csv`) are written to `/kaggle/working`, which Kaggle persists as the notebook's output.
-- **Runtime (training):** a full run (5-fold × 2 networks × 3 seeds, plus the CatBoost CV) took about **131 minutes** wall-clock on the two T4s (≈98 min neural-network CV, ≈29 min CatBoost CV, <1 min test-set inference). Timing varies with the platform machine: expect roughly ±20%.
+- **Runtime (training):** a full run (5-fold × 2 networks × 3 seeds, plus the CatBoost CV) took about **130 minutes** wall-clock on the two T4s (≈95 min neural-network CV, ≈29 min CatBoost CV, <1 min test-set inference). Timing varies with the platform machine: expect roughly ±20%.
 - **Internet access:** the only network call in the training notebook is `!pip install -q iterative-stratification` in the first code cell, so the "Internet" toggle must be **on** for that session. The inference notebook makes no network call and runs with internet **off**.
 
 Running **on Kaggle** (Option A below) is the path closest to how the notebooks were built and validated. The training notebook can also be run **locally** (Option B): only `DATA_DIR` and `WORK_DIR` need to point elsewhere, and a GPU must be provided by the local machine.
@@ -39,9 +39,9 @@ The trained artifacts used by the inference notebook are not included either; th
 
 ## 4. Prerequisites (both options)
 
-- Python 3.12 (the version the training notebook was developed and run on)
+- Python 3.12 (training) and 3.13 (inference).
 - A CUDA-capable GPU is strongly recommended. Without one, training time for the full multi-seed, multi-model cross-validation would be prohibitively long.
-- Packages (see [`requirements.txt`](requirements.txt)): `numpy`, `pandas`, `scipy`, `joblib`, `scikit-learn`, `torch`, `iterative-stratification`, `catboost`, `matplotlib` (exploratory plots). Versions are not pinned; to record the exact environment of a working run, execute `pip freeze > requirements-frozen.txt` in it.
+- Packages (see [`requirements.txt`](requirements.txt)): `numpy`, `pandas`, `scipy`, `joblib`, `scikit-learn`, `torch`, `iterative-stratification`, `catboost`, `matplotlib` (exploratory plots). `requirements.txt` lists the packages without versions. `requirements-frozen.txt` pins the versions of the Kaggle environment of the reported run.
 - The inference notebook needs the same libraries, minus `iterative-stratification`. The fold preprocessing pipelines are `scikit-learn` pickles, so the installed `scikit-learn` version should match the one used for training. Step 9.1 of the inference notebook prints the installed versions.
 
 ---
@@ -49,7 +49,7 @@ The trained artifacts used by the inference notebook are not included either; th
 ## 5. Option A — Run the training notebook on Kaggle (environment it was built in)
 
 1. Go to the competition page, <https://www.kaggle.com/competitions/lish-moa>, and join the competition if required (accepting its rules is needed to access the data).
-2. On Kaggle, click **Create → New Notebook**, then **File → Import Notebook** and upload [`moa_prediction.ipynb`](moa_prediction.ipynb).
+2. On Kaggle, click **Create → New Notebook**, then **File → Import Notebook** and upload [`moa-training.ipynb`](moa-training.ipynb).
 3. Attach the competition data: in the right-hand panel, **Add Input** → search `lish-moa` → **Mechanisms of Action (MoA) Prediction** → **Add**. This mounts the four CSV files under `/kaggle/input/competitions/lish-moa`, matching the default `DATA_DIR`.
 4. Set the accelerator: **Notebook Settings** → **Accelerator** → **GPU T4 x2** (any CUDA GPU works, but this reproduces the original setup and runtime; a single-GPU accelerator runs with `N_GPUS = 1`, so fewer jobs run in parallel).
 5. Set **Internet: On** in the same settings panel (needed only for the first code cell's `pip install`).
@@ -91,7 +91,7 @@ pip install jupyterlab             # or `notebook`, to open/run the .ipynb local
 
 ### 6.3 Point the notebook at your local paths
 
-Open the notebook (`jupyter lab moa_prediction.ipynb`) and, in the first configuration code cell (Step 1.3), change:
+Open the notebook (`jupyter lab moa-training.ipynb`) and, in the first configuration code cell (Step 1.3), change:
 
 ```python
 DATA_DIR = "/kaggle/input/competitions/lish-moa"   # -> "./data" (or wherever you unzipped the CSVs)
@@ -104,7 +104,7 @@ All paths, including the output `submission.csv`, are derived from these two con
 
 Run all cells top to bottom (`Run → Run All Cells` in Jupyter Lab, or `Kernel → Restart & Run All`). `submission.csv` is written to the `WORK_DIR` you configured above.
 
-**Expected runtime:** on a machine with a single modern CUDA GPU, expect roughly 2–4× the ~131-minute reference runtime (the code parallelises across GPUs, so a single-GPU machine loses that 2-way overlap; this factor is an estimate, not a measurement). On CPU only, plan for several hours to a day depending on core count; CatBoost falls back to CPU automatically.
+**Expected runtime:** on a machine with a single modern CUDA GPU, expect roughly 2–4× the ~130-minute reference runtime (the code parallelises across GPUs, so a single-GPU machine loses that 2-way overlap; this factor is an estimate, not a measurement). On CPU only, plan for several hours to a day depending on core count; CatBoost falls back to CPU automatically.
 
 ---
 
@@ -115,13 +115,13 @@ A rerun should give values close to the following (out-of-fold mean log loss, tr
 | Model | OOF log loss |
 |---|---|
 | TabularResNet | 0.01632 |
-| FT-Transformer | 0.01642 |
+| FT-Transformer | 0.01643 |
 | CatBoost | 0.01699 |
-| Ensemble (nested) | 0.01605 ± 0.00019 |
+| Ensemble (nested) | 0.01607 ± 0.00017 |
 
 The exploratory analysis (Step 2.3) should report 23,814 rows (21,948 treated, 1,866 control), a positive rate of 0.00373 on treated rows, and 53 of 206 targets with fewer than 20 positives.
 
-Mixed precision and parallel GPU jobs make runs non-deterministic: expect differences of the order of 1e-5 in the OOF scores and a few hundredths in the blend weights (final weights of the reference run: ResNet 0.436, FT-Transformer 0.387, CatBoost 0.177), not an exact match.
+Mixed precision and parallel GPU jobs make runs non-deterministic: expect differences of the order of 1e-5 in the OOF scores and a few hundredths in the blend weights (final weights of the reference run: ResNet 0.4529, FT-Transformer 0.3746, CatBoost 0.1725), not an exact match.
 
 ---
 
@@ -129,7 +129,7 @@ Mixed precision and parallel GPU jobs make runs non-deterministic: expect differ
 
 ### 8.1 What it does
 
-[`moa_inference.ipynb`](moa_inference.ipynb) rebuilds the networks, loads the saved weights, fitted preprocessing pipelines and blend weights, and predicts the test set. It reuses the training code for the feature engineering, the architectures, the pipelines (transform only), the inference and the submission checks, so the predictions are identical. It takes about a minute on a GPU, needs no internet, and writes `/kaggle/working/submission.csv`. It never writes to the artifacts folder, which is read-only on Kaggle.
+[`moa-inference.ipynb`](moa-inference.ipynb) rebuilds the networks, loads the saved weights, fitted preprocessing pipelines and blend weights, and predicts the test set. It reuses the training code for the feature engineering, the architectures, the pipelines (transform only), the inference and the submission checks, with just few differences. It takes about a minute on a GPU, needs no internet, and writes `/kaggle/working/submission.csv`. It never writes to the artifacts folder, which is read-only on Kaggle.
 
 ### 8.2 Create the Dataset of artifacts
 
@@ -146,11 +146,11 @@ The Dataset used for the reported submission is private to the author's account:
 
 ### 8.3 Run the inference notebook
 
-1. Create a new Kaggle notebook and import [`moa_inference.ipynb`](moa_inference.ipynb).
+1. Create a new Kaggle notebook and import [`moa-inference.ipynb`](moa-inference.ipynb).
 2. **Add Input**: the competition `lish-moa` and the Dataset `moa-artifacts`.
 3. Set **Internet: Off**. Select a GPU accelerator (a CPU-only run works but the FT-Transformer is slow).
 4. Run all cells. The notebook locates the two input folders by file name (`metadata.json` and `test_features.csv`), so no path needs editing. If it does not find exactly one folder for a file, it stops with an explicit message.
-5. Step 9.1 checks that all 51 artifact files exist and prints the library versions; Step 9.5 runs the sanity checks and writes `submission.csv`.
+5. Step 9.1 checks that the 50 files listed above exist (check_artifacts); metadata.json, the 51st, is read in Step 2.1. Step 9.5 runs the sanity checks and writes `submission.csv`.
 
 ### 8.4 Consistency check
 
@@ -166,10 +166,10 @@ Save the notebook version first (**Save Version → Save & Run All**): the submi
 
 | Estimate | Log loss |
 |---|---|
-| Nested-CV blend, treated rows only | 0.01605 ± 0.00019 |
-| Nested-CV blend, rescaled to all test rows (× 0.910) | 0.01461 |
+| Nested-CV blend, treated rows only | 0.01607 ± 0.00017 |
+| Nested-CV blend, rescaled to all test rows (× 0.910) | 0.01462 |
 | Kaggle private score | 0.01634 |
-| Kaggle public score | 0.01864 |
+| Kaggle public score | 0.01865 |
 
 The private score is 11.8% above the rescaled CV estimate, so the cross-validated estimate is optimistic. See the top-level [`README.md`](../README.md) for the rescaling and the discussion of the gap.
 

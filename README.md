@@ -44,7 +44,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 | Post-processing | Control-vehicle test rows set to 0 |
 | Inference | Separate notebook: loads the 30 network checkpoints, 5 CatBoost models, 10 fold pipelines and the blend weights; no training |
 
-Architectural and implementation details are documented inline in the notebooks — see [`software/moa_prediction.ipynb`](software/moa_prediction.ipynb) (training) and [`software/moa_inference.ipynb`](software/moa_inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](software/README.md); the slides are in [`doc/`](doc/).
+Architectural and implementation details are documented inline in the notebooks — see [`software/moa-training.ipynb`](software/moa-training.ipynb) (training) and [`software/moa-inference.ipynb`](software/moa-inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](software/README.md); the slides are in [`doc/`](doc/).
 
 ## Results
 
@@ -54,28 +54,35 @@ Out-of-fold (OOF) mean log loss over the 5 folds, treated rows only (lower is be
 
 | Model | OOF log loss |
 |---|---|
+| Baseline | 0.0222 |
 | TabularResNet | **0.01632** |
-| FT-Transformer | 0.01642 |
+| FT-Transformer | 0.01643 |
 | CatBoost | 0.01699 |
-| **Ensemble (nested, honest estimate)** | **0.01605 ± 0.00019** |
+| **Ensemble (nested, honest estimate)** | **0.01607 ± 0.00017** |
 
-Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. They agree to five decimals (0.01605); the difference is 9.4e-7, which measures the optimism of the blending step. With only three weights to fit it is negligible. This agreement says nothing about leakage from the CV design itself (see Limitations).
+Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. They agree to five decimals (0.01607); the difference is 1.58e-6, which measures the optimism of the blending step. With only three weights to fit it is negligible. This agreement says nothing about leakage from the CV design itself (see Limitations).
+The *nested* score is 27.6% lower than the *baseline* OOF log loss value.
 
 Final blend weights (averaged across the nested-CV folds):
 
 | Model | Weight |
 |---|---|
-| TabularResNet | 0.436 |
-| FT-Transformer | 0.387 |
-| CatBoost | 0.177 |
+| TabularResNet | 0.4529 |
+| FT-Transformer | 0.3746 |
+| CatBoost | 0.1725 |
 
-(Exact values: 0.4356, 0.3870, 0.1774.)
+The ensemble is about 1.5% better than the best single model (ResNet). TabularResNet and FT-Transformer carry about 83% of the weight. CatBoost, despite the weakest standalone score, still earns 17% of it; a plausible reason is that tree-based errors differ from the networks', in fact a blend without CatBoost the OOF log loss value would increase to 0.01612, with a standard deviation of 0.00018.
+The following table shows the results excluding one of the three models:
 
-The ensemble is about 1.7% better than the best single model (ResNet). TabularResNet and FT-Transformer carry about 82% of the weight. CatBoost, despite the weakest standalone score, still earns 18% of it; a plausible reason is that tree-based errors differ from the networks', but this was **not measured** here.
+| Model excluded | OOF log loss | Weights |
+|---|---|---|
+| ResNet | 0.01624 ± 0.00013 | [FT-Transformer: 0.6789, CatBoost: 0.3211] |
+| FT-Transformer | 0.01619 ± 0.00019 | [ResNet: 0.714, CatBoost: 0.286] |
+| ResNet | 0.01612 ± 0.00018 | [ResNet: 0.5474, FT-Transformer: 0.4526] |
 
 Per-fold scores in the notebook output are the mean of the per-seed losses; they are higher than the OOF scores, which use seed-averaged predictions (bagging gain of about 0.0005 per network).
 
-A full training run (5 folds × 2 networks × 3 seeds, plus the CatBoost CV) took about 131 minutes on a Kaggle notebook with 2× NVIDIA T4 (98.5 min neural-network CV, 29.1 min CatBoost CV, under 1 min test-set inference). Wall-clock time is noisy on the platform: the ablation configurations below, which train more jobs, finished in 106–113 minutes.
+A full training run (5 folds × 2 networks × 3 seeds, plus the CatBoost CV) took about 130 minutes on a Kaggle notebook with 2× NVIDIA T4 (95 min neural-network CV, 29 min CatBoost CV, under 1 min test-set inference). Wall-clock time is noisy on the platform: the ablation configurations below, which train more jobs, finished in 106–113 minutes.
 
 ### Independent check on the Kaggle test set
 
@@ -83,14 +90,14 @@ The final model was submitted **once**, as a late submission, through the infere
 
 | Estimate | Log loss |
 |---|---|
-| Nested-CV blend, treated rows only | 0.01605 ± 0.00019 |
-| Nested-CV blend, rescaled to all test rows | 0.01461 |
+| Nested-CV blend, treated rows only | 0.01607 ± 0.00017 |
+| Nested-CV blend, rescaled to all test rows | 0.01462 |
 | Kaggle private score | **0.01634** |
-| Kaggle public score | 0.01864 |
+| Kaggle public score | 0.01865 |
 
-The cross-validation scores are computed on treated rows only, whereas the Kaggle score averages over all test rows. Control rows are predicted as 0 with true value 0 and add almost no loss, so the all-rows score is approximately the treated-only score multiplied by the share of treated rows. That share is 0.910 in the public test set, which gives the rescaled estimate 0.01605 × 0.910 = 0.01461. The share in the hidden part of the test set may differ slightly, so the rescaling is approximate.
+The cross-validation scores are computed on treated rows only, whereas the Kaggle score averages over all test rows. Control rows are predicted as 0 with true value 0 and add almost no loss, so the all-rows score is approximately the treated-only score multiplied by the share of treated rows. That share is 0.910 in the public test set, which gives the rescaled estimate 0.01607 × 0.910 = 0.01462. The share in the hidden part of the test set may differ slightly, so the rescaling is approximate.
 
-The private score is 11.8% above the rescaled CV estimate and the public score is 27.6% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see Limitations), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
+The private score is 11.8% above the rescaled CV estimate and the public score is 27.5% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see Limitations), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
 
 ### Ablation: is an extra network worth it?
 
@@ -104,38 +111,43 @@ Three configurations with a fourth model were also run on the same folds. The ba
 | No extra network (baseline at the time of the ablation) | – | 0.01606 | – | 129 min |
 | **No extra network (final rerun)** | – | **0.01605** | – | 131 min |
 
-The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00019) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. The code of the MLP and 1D-CNN is not part of this repository, so this ablation cannot be reproduced from it.
+The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. The code of the MLP and 1D-CNN is part of this repository, and can be found in this folder: [`software/ablated-models/`](software/ablated-models/).
 
 ### Protocol note
 
 An earlier version of the code selected the best epoch on the same fold that produced the OOF predictions, giving an ensemble score of 0.01595. The final code uses an inner validation split instead, and the score moved to about 0.0161. The difference of about 0.0001 is consistent with selection optimism, but it also includes the effect of training on 10% less data per fold and the run-to-run noise (about 1e-5), so it is not an exact measurement of the optimism.
 
+### Leaderboard
+
+The results achieved would rank approximately 1400th of 4,373 in the private leaderboard and 1800th in the public one. Late submission do not occur in the leaderboards, so this is only an approximation based on the Kaggle rankings for this competition.
+
 ## Limitations
 
-- **No grouping by compound.** The competition data has no drug identifier, so the same compound can appear in the training and validation split of a fold, while the test set contains different compounds. The Kaggle private score (0.01634) is above the rescaled CV estimate (0.01461), which is consistent with this limitation.
+- **No grouping by compound.** The competition data has no drug identifier, so the same compound can appear in the training and validation split of a fold, while the test set contains different compounds. The Kaggle private score (0.01634) is above the rescaled CV estimate (0.01462), which is consistent with this limitation.
 - **Selection bias from tuning.** Hyperparameters, architectures and the final 3-model choice were selected by looking at OOF scores on the same 5 folds that are reported. No hold-out was reserved before tuning, and nested cross-validation of the whole procedure was too costly (estimated at tens of hours on the available GPUs). The CV scores are therefore optimistic by an unknown amount. The differences between the configurations that were compared are below the fold standard deviation.
 - **Preprocessing fitted on the whole training fold.** The RankGauss and PCA transforms are fitted on the entire training fold, including the 10% inner validation rows. The transforms are unsupervised, so no labels leak and the outer fold is never seen; the only possible effect is a slightly optimistic early-stopping choice.
 - **CV on treated rows only.** CV scores are comparable with leaderboard scores only after rescaling by the treated share (see above).
 - **One submission, noisy test subsets.** The Kaggle score comes from a single submission. Public and private scores differ by 0.0023, more than ten times the fold standard deviation, so the fold standard deviation understates the uncertainty on unseen data. Late submissions do not appear on the leaderboard.
 - **Non-determinism.** Repeated GPU runs differ by about 1e-5 in OOF log loss.
-- No ablation of individual design choices (PCA vs. raw features, label smoothing) was run.
+- **No ablation** of individual design choices (PCA vs. raw features, label smoothing) was run.
+- **Mixed precision** in validation, full precision at test time. Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the OOF log loss differs by 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) between the two modes (Step 15.1), against an ensemble gain of about 3e-4.
 - **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see `software/README.md`).
 
 ## Repository structure
 
 ```
 merlonghi-moa-prediction/
-├── README.md                          <- this file
+├── README.md                             <- this file
 ├── software/
-│     ├── README.md                    <- setup / how-to-run instructions
-│     ├── moa_prediction.ipynb         <- training and cross-validation
-│     ├── moa_notebook_landscape.pdf   <- landscape export of the training notebook
-│     ├── moa_inference.ipynb          <- inference and Kaggle submission
-│     ├── moa_inference_landscape.pdf  <- landscape export of the inference notebook
-│     └── requirements.txt             <- python packages to install
+│     ├── README.md                       <- setup / how-to-run instructions
+│     ├── moa-training.ipynb              <- training and cross-validation
+│     ├── moa-training.pdf                <- landscape export of the training notebook
+│     ├── moa-inference.ipynb             <- inference and Kaggle submission
+│     ├── moa-inference.pdf               <- landscape export of the inference notebook
+│     └── requirements.txt                <- python packages to install
 └── doc/
       ├── moa_presentation.pdf
-      └── moa_presentation.tex         <- latex beamer
+      └── moa_presentation.tex            <- latex beamer
 ```
 
 ## References

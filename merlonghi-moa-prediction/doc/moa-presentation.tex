@@ -105,7 +105,6 @@
 \title{MoA Prediction}
 \subtitle{Multi-Model Ensemble for Mechanisms-of-Action Classification}
 \author{Marco Merlonghi}
-\date{\today}
 
 \begin{document}
 
@@ -124,7 +123,7 @@
     \node[anchor=west, text=bgcream, font=\Huge\bfseries] at ([xshift=1cm,yshift=1cm]current page.west)
       {MoA Prediction};
     \node[anchor=west, text=accent, font=\Large] at ([xshift=1.05cm,yshift=0.2cm]current page.west)
-      {A Multi-Model Ensemble for Mechanism-of-Action Classification};
+      {A Multi-Model Ensemble for Mechanisms-of-Action Classification};
     \node[anchor=west, text=bgcream!70, font=\small] at ([xshift=1.05cm,yshift=-0.7cm]current page.west)
       {Marco Merlonghi \quad\textbar\quad Project Work in Machine Learning and Data Mining};
   \end{tikzpicture}
@@ -139,7 +138,7 @@
   \begin{columns}[T]
     \begin{column}{0.58\textwidth}
       \begin{itemize}
-        \item \textbf{Host:} Laboratory for Innovation Science at Harvard (LISH), with the Broad Institute's Connectivity Map (LINCS);
+        \item \textbf{Host:} the Broad Institute of MIT and Harvard, the Laboratory for Innovation Science at Harvard (LISH), and the NIH Common Funds Library of Integrated Network-Based Cellular Signatures (LINCS);
         \item \textbf{Platform:} Kaggle -- \url{https://kaggle.com/c/lish-moa};
         \item \textbf{Timeline:} launched and closed in 2020 (final deadline Nov.\ 30, 2020);
         \item \textbf{Scale:} 4,373 teams on the final leaderboard;
@@ -532,13 +531,13 @@ CATBOOST: 250 iters, depth 5,
         \item \texttt{joblib} + \texttt{loky} backend, GPUs assigned \textbf{round-robin}
         \item 2 GPUs $\times$ 2 jobs/GPU $=$ \textbf{4 parallel workers}
         \item Predictions averaged over the 3 seeds per (fold, model)
-        \item Wall-clock: NN CV 98.5 min, CatBoost CV 29.1 min, inference 0.5 min (total 131 min)
+        \item Wall-clock: NN CV 95 min, CatBoost CV 29 min, inference 0.5 min (total $\approx$130 min)
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
       \begin{lstlisting}
 NN_JOBS_PER_GPU = 2
-N_JOBS_NN = N_GPUS * NN_JOBS_PER_GPU
+N_JOBS_NN = max(1, N_GPUS * NN_JOBS_PER_GPU)
 
 Parallel(n_jobs=N_JOBS_NN,
          backend="loky")(
@@ -567,7 +566,7 @@ Parallel(n_jobs=N_JOBS_NN,
       \textbf{Nested CV}
       \begin{itemize}
         \item Weights fit on $k-1$ folds, scored on the held-out fold; final weights = mean across folds
-        \item In-sample score (weights fit on all OOF rows): 0.01605, equal to the nested one; gap $9.4\cdot10^{-7}$. The blending step is not optimistic with three weights; this says nothing about leakage from the CV design
+        \item In-sample score (weights fit on all OOF rows): 0.01606, the nested one is 0.01607; gap $1.58\cdot10^{-6}$. The blending step is not optimistic with three weights; this says nothing about leakage from the CV design
       \end{itemize}
     \end{column}
     \begin{column}{0.54\textwidth}
@@ -578,11 +577,11 @@ Parallel(n_jobs=N_JOBS_NN,
         \toprule
         \textbf{Fold} & \textbf{Score} & $w_{\text{resnet}}$ & $w_{\text{ft}}$ & $w_{\text{cb}}$ \\
         \midrule
-        0 & 0.01603 & 0.431 & 0.391 & 0.177 \\
-        1 & 0.01618 & 0.447 & 0.383 & 0.170 \\
-        2 & 0.01570 & 0.424 & 0.387 & 0.188 \\
-        3 & 0.01611 & 0.430 & 0.385 & 0.185 \\
-        4 & 0.01623 & 0.445 & 0.388 & 0.166 \\
+        0 & 0.01605 & 0.45 & 0.377 & 0.173 \\
+        1 & 0.01618 & 0.468 & 0.367 & 0.165 \\
+        2 & 0.01575 & 0.431 & 0.387 & 0.182 \\
+        3 & 0.01612 & 0.448 & 0.37 & 0.181 \\
+        4 & 0.01623 & 0.468 & 0.372 & 0.16 \\
         \bottomrule
       \end{tabular}
     \end{column}
@@ -592,12 +591,12 @@ Parallel(n_jobs=N_JOBS_NN,
     \begin{column}{0.48\textwidth}
       \begin{block}{Final weights (mean across folds)}
         \small
-        ResNet 43.6\% \textbar\ FT-Transformer 38.7\% \textbar\ CatBoost 17.7\%
+        ResNet 45.29\% \textbar\ FT-Transformer 37,46\% \textbar\ CatBoost 17.25\%
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{exampleblock}{Honest nested-blend score}
-        \small $0.01605 \pm 0.00019$
+        \small $0.01607 \pm 0.00017$
       \end{exampleblock}
     \end{column}
   \end{columns}
@@ -618,13 +617,13 @@ Parallel(n_jobs=N_JOBS_NN,
         \toprule
         \textbf{Fold} & \textbf{ResNet} & \textbf{FT-Tr.} & \textbf{CatBoost} \\
         \midrule
-        0 & 0.01686 & 0.01695 & 0.01707 \\
-        1 & 0.01705 & 0.01711 & 0.01707$^{*}$ \\
-        2 & 0.01652 & 0.01655 & 0.01676 \\
-        3 & 0.01679 & 0.01682 & 0.01701$^{*}$ \\
-        4 & 0.01700 & 0.01706 & 0.01704 \\
+        0 & 0.01686 & 0.01693 & 0.01707 \\
+        1 & 0.01705 & 0.01714 & 0.01707$^{*}$ \\
+        2 & 0.01652 & 0.01657 & 0.01676 \\
+        3 & 0.01679 & 0.01690 & 0.01701$^{*}$ \\
+        4 & 0.01700 & 0.01702 & 0.01704 \\
         \midrule
-        \textbf{Mean} & 0.01684 & 0.01690 & 0.01699 \\
+        \textbf{Mean} & 0.01684 & 0.01691 & 0.01699 \\
         \bottomrule
       \end{tabular}
 
@@ -644,18 +643,18 @@ Parallel(n_jobs=N_JOBS_NN,
         }
         \draw[primary!15, dashed] (3mm,0) -- (3mm,-23mm);
         \fill[accent2] (3mm,0) circle (1.6mm);
-        \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (5.5mm,0) {Ensemble (nested) 0.01605};
+        \node[anchor=west, text=primary, font=\scriptsize\bfseries] at (5.5mm,0) {Ensemble (nested) 0.01607};
         \fill[secondary] (19.2mm,-6mm) circle (1.4mm);
         \node[anchor=west, text=primary] at (21.5mm,-6mm) {ResNet 0.01632};
         \fill[secondary] (25.2mm,-12mm) circle (1.4mm);
-        \node[anchor=west, text=primary] at (27.5mm,-12mm) {FT-Transformer 0.01642};
+        \node[anchor=west, text=primary] at (27.5mm,-12mm) {FT-Transformer 0.01643};
         \fill[secondary] (59.4mm,-18mm) circle (1.4mm);
         \node[anchor=east, text=primary] at (57mm,-18mm) {CatBoost 0.01699};
         \node[anchor=north, text=primary!70, font=\tiny] at (33mm,-27.5mm) {lower is better; zoomed axis, not from zero};
       \end{tikzpicture}
 
       \vspace{2mm}
-      \scriptsize Seed-averaged predictions lower the loss by about 0.0005 per network (bagging gain). Fold standard deviation of the blend: 0.00019. Ensemble vs.\ best single model: about 1.7\% better.
+      \scriptsize Seed-averaged predictions lower the loss by about 0.0005 per network (bagging gain). Fold standard deviation of the blend: 0.00017. Ensemble vs.\ best single model: about 1.6\% better.
     \end{column}
   \end{columns}
 \end{frame}
@@ -672,10 +671,10 @@ Parallel(n_jobs=N_JOBS_NN,
         \toprule
         \textbf{Estimate} & \textbf{Log loss} \\
         \midrule
-        Nested CV, treated rows only & 0.01605 $\pm$ 0.00019 \\
-        Rescaled to all rows ($\times$ 0.910) & 0.01461 \\
+        Nested CV, treated rows only & 0.01607 $\pm$ 0.00017 \\
+        Rescaled to all rows ($\times$ 0.910) & 0.01462 \\
         \textbf{Kaggle private} & \textbf{0.01634} (+11.8\%) \\
-        Kaggle public & 0.01864 (+27.6\%) \\
+        Kaggle public & 0.01865 (+27.5\%) \\
         \bottomrule
       \end{tabular}
 
@@ -685,7 +684,6 @@ Parallel(n_jobs=N_JOBS_NN,
     \begin{column}{0.5\textwidth}
       \begin{itemize}
         \item \textbf{Late submission} through a separate \textbf{inference notebook}: loads 30 checkpoints, 5 CatBoost models, 10 fold pipelines and the blend weights; no training, no internet
-        \item Predictions match the training notebook's (max.\ abs.\ difference $1.1\cdot10^{-16}$)
         \item Submitted \textbf{once}; the test set was never used for tuning
       \end{itemize}
     \end{column}
@@ -718,7 +716,7 @@ Parallel(n_jobs=N_JOBS_NN,
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{Reading}
-        \small All ensembles score 0.01604--0.01606: the differences ($\le 2\cdot10^{-5}$) are below the fold standard deviation (0.00019) and the run-to-run GPU noise ($\approx 10^{-5}$). The ablation ran on an earlier code revision.
+        \small All ensembles score 0.01604--0.01606: the differences ($\le 2\cdot10^{-5}$) are below the fold standard deviation (0.00017) and the run-to-run GPU noise ($\approx 10^{-5}$). The ablation ran on an earlier code revision.
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -740,10 +738,10 @@ Parallel(n_jobs=N_JOBS_NN,
     \begin{column}{0.5\textwidth}
       \textbf{Findings}
       \begin{itemize}
-        \item Ensemble 0.01605 vs.\ best single model (ResNet) 0.01632: $\approx$1.7\% better
-        \item ResNet and FT-Transformer carry $\approx$82\% of the weight; CatBoost, weakest alone, gets 18\%
+        \item Ensemble 0.01607 vs.\ best single model (ResNet) 0.01632: $\approx$1.6\% better
+        \item ResNet and FT-Transformer carry $\approx$83\% of the weight; CatBoost, weakest alone, gets $\approx$17\%
         \item An extra network (MLP or 1D-CNN) does not improve the blend
-        \item Kaggle test set: private 0.01634, public 0.01864, against a rescaled CV estimate of 0.01461
+        \item Kaggle test set: private 0.01634, public 0.01865, against a rescaled CV estimate of 0.01462
       \end{itemize}
       \textbf{Future work}
       \begin{itemize}
@@ -758,7 +756,6 @@ Parallel(n_jobs=N_JOBS_NN,
         \item Design choices made on the same folds that are reported; no hold-out reserved before tuning
         \item The inner split removes 10\% of the training data; an earlier protocol that selected epochs on the OOF fold gave 0.01595, a difference consistent with selection optimism but mixed with the data loss and noise
         \item GPU non-determinism: repeated runs differ by $\approx 10^{-5}$
-        \item Why CatBoost earns weight (diverse errors) was not measured
       \end{itemize}
     \end{column}
   \end{columns}
