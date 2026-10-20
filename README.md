@@ -146,7 +146,7 @@ The results would rank approximately 1400th of 4,373 in the private leaderboard 
 - **Non-determinism.** Repeated GPU runs differ by about 1e-5 in OOF log loss.
 - **No ablation** of individual design choices (PCA vs. raw features for the ResNet, label smoothing) was run. The only raw-vs-PCA comparison concerns the 1D-CNN of the extra-network ablation.
 - **Mixed precision in validation, full precision at test time.** Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the two modes differ by at most 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) in predicted probability, but the log loss is identical to six decimals (0.016815 vs. 0.016815 and 0.016856 vs. 0.016856, Step 15.1). The effect on the blend weights was not measured separately.
-- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see `software/README.md`).
+- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see [`software/README.md`](software/README.md)).
 
 ## Repository structure
 
