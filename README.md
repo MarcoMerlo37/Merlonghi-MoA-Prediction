@@ -25,7 +25,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 - Compare several modelling paradigms on the same folds: a residual tabular network (TabularResNet), an attention-based FT-Transformer [2], and a gradient-boosted tree model (CatBoost) [3], each fed a preprocessing pipeline suited to it.
 - Reduce variance through multi-seed bagging and 5-fold multilabel-stratified cross validation [4, 5], and combine the base models with an ensemble whose weights are learned and re-validated through nested cross-validation.
 - Check the cross-validated estimate against an independent measure: the Kaggle test set, used once and never for tuning.
-- Produce a clean, reproducible, well-documented deliverable (see `software/`).
+- Produce a clean, reproducible, well-documented deliverable (see [`software/`](software/)).
 
 ## Approach summary
 
@@ -108,7 +108,7 @@ The final model was submitted **once**, as a late submission, through the infere
 
 The cross-validation scores are computed on treated rows only, whereas the Kaggle score averages over all test rows. Control rows are predicted as 0 with true value 0 and add almost no loss, so the all-rows score is approximately the treated-only score multiplied by the share of treated rows. That share is 0.910 in the public test set, which gives the rescaled estimate 0.01607 × 0.910 = 0.01462. The share in the hidden part of the test set may differ slightly, so the rescaling is approximate.
 
-The private score is 11.8% above the rescaled CV estimate and the public score is 27.5% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see Limitations), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
+The private score is 11.8% above the rescaled CV estimate and the public score is 27.5% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see [Limitations](#Limitations)), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
 
 ### Ablation: is an extra network worth it?
 
@@ -124,7 +124,7 @@ Three configurations with a fourth model were also run on the same folds. The ba
 
 The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. 
 
-The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](software/ablated-models/) (see the README of that folder for how to plug them into the training notebook). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
+The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](software/ablated-models/). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
 
 The "differences below the fold standard deviation" argument is unpaired. The per-fold scores of the ablation runs were not kept, so a paired comparison (as done above for CatBoost) was not possible; the conclusion therefore rests on the differences being of the same order as the run-to-run noise.
 
