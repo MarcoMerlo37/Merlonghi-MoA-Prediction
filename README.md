@@ -9,7 +9,7 @@ This project addresses the Kaggle **Mechanisms of Action (MoA) Prediction** chal
 - Competition page: <https://www.kaggle.com/competitions/lish-moa>
 - Data: <https://www.kaggle.com/competitions/lish-moa/data>
 
-The solution is delivered as two notebooks (see [`software/`](merlonghi-moa-prediction/software/)): a **training** notebook, which cross-validates the models and saves them, and an **inference** notebook, which loads the saved models and produces the Kaggle submission. The final model was submitted once to the Kaggle test set as a late submission (see [Results](#results)).
+The solution is delivered as two notebooks (see [`software/`](software/)): a **training** notebook, which cross-validates the models and saves them, and an **inference** notebook, which loads the saved models and produces the Kaggle submission. The final model was submitted once to the Kaggle test set as a late submission (see [Results](#results)).
 
 ### Data in brief
 
@@ -25,7 +25,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 - Compare several modelling paradigms on the same folds: a residual tabular network (TabularResNet), an attention-based FT-Transformer [2], and a gradient-boosted tree model (CatBoost) [3], each fed a preprocessing pipeline suited to it.
 - Reduce variance through multi-seed bagging and 5-fold multilabel-stratified cross validation [4, 5], and combine the base models with an ensemble whose weights are learned and re-validated through nested cross-validation.
 - Check the cross-validated estimate against an independent measure: the Kaggle test set, used once and never for tuning.
-- Produce a clean, reproducible, well-documented deliverable (see [`software/`](merlonghi-moa-prediction/software/)).
+- Produce a clean, reproducible, well-documented deliverable (see [`software/`](software/)).
 
 ## Approach summary
 
@@ -44,7 +44,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 | Post-processing | Control-vehicle test rows set to 0 |
 | Inference | Separate notebook: loads the 30 network checkpoints, 5 CatBoost models, 10 fold pipelines and the blend weights; no training |
 
-Architectural and implementation details are documented inline in the notebooks — see [`software/moa-training.ipynb`](merlonghi-moa-prediction/software/moa-training.ipynb) (training) and [`software/moa-inference.ipynb`](merlonghi-moa-prediction/software/moa-inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](merlonghi-moa-prediction/software/README.md); the slides are in [`doc/`](merlonghi-moa-prediction/doc/).
+Architectural and implementation details are documented inline in the notebooks — see [`software/moa-training.ipynb`](software/moa-training.ipynb) (training) and [`software/moa-inference.ipynb`](software/moa-inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](software/README.md); the slides are in [`doc/`](doc/).
 
 ## Results
 
@@ -124,7 +124,7 @@ Three configurations with a fourth model were also run on the same folds. The ba
 
 The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. 
 
-The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](merlonghi-moa-prediction/software/ablated-models/). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
+The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](software/ablated-models/). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
 
 The "differences below the fold standard deviation" argument is unpaired. The per-fold scores of the ablation runs were not kept, so a paired comparison (as done above for CatBoost) was not possible; the conclusion therefore rests on the differences being of the same order as the run-to-run noise.
 
@@ -146,12 +146,12 @@ The results would rank approximately 1400th of 4,373 in the private leaderboard 
 - **Non-determinism.** Repeated GPU runs differ by about 1e-5 in OOF log loss.
 - **No ablation** of individual design choices (PCA vs. raw features for the ResNet, label smoothing) was run. The only raw-vs-PCA comparison concerns the 1D-CNN of the extra-network ablation.
 - **Mixed precision in validation, full precision at test time.** Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the two modes differ by at most 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) in predicted probability, but the log loss is identical to six decimals (0.016815 vs. 0.016815 and 0.016856 vs. 0.016856, Step 15.1). The effect on the blend weights was not measured separately.
-- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see [`software/README.md`](merlonghi-moa-prediction/software/README.md)).
+- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see [`software/README.md`](software/README.md)).
 
 ## Repository structure
 
 ```
-merlonghi-moa-prediction/
+Merlonghi-MoA-Prediction
 ├── README.md                             <- this file
 ├── software/
 │     ├── README.md                       <- setup / how-to-run instructions
