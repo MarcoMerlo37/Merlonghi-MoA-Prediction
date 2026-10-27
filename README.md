@@ -9,7 +9,7 @@ This project addresses the Kaggle **Mechanisms of Action (MoA) Prediction** chal
 - Competition page: <https://www.kaggle.com/competitions/lish-moa>
 - Data: <https://www.kaggle.com/competitions/lish-moa/data>
 
-The solution is delivered as two notebooks (see [`software/`](software/)): a **training** notebook, which cross-validates the models and saves them, and an **inference** notebook, which loads the saved models and produces the Kaggle submission. The final model was submitted once to the Kaggle test set as a late submission (see [Results](#results)).
+The solution is delivered as two notebooks (see [`software/`](merlonghi-moa-prediction/software/)): a **training** notebook, which cross-validates the models and saves them, and an **inference** notebook, which loads the saved models and produces the Kaggle submission. The final model was submitted once to the Kaggle test set as a late submission (see [Results](#results)).
 
 ### Data in brief
 
@@ -25,7 +25,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 - Compare several modelling paradigms on the same folds: a residual tabular network (TabularResNet), an attention-based FT-Transformer [2], and a gradient-boosted tree model (CatBoost) [3], each fed a preprocessing pipeline suited to it.
 - Reduce variance through multi-seed bagging and 5-fold multilabel-stratified cross validation [4, 5], and combine the base models with an ensemble whose weights are learned and re-validated through nested cross-validation.
 - Check the cross-validated estimate against an independent measure: the Kaggle test set, used once and never for tuning.
-- Produce a clean, reproducible, well-documented deliverable (see `software/`).
+- Produce a clean, reproducible, well-documented deliverable (see [`software/`](merlonghi-moa-prediction/software/)).
 
 ## Approach summary
 
@@ -44,7 +44,7 @@ Figures from the exploratory analysis in the training notebook (Step 2.3):
 | Post-processing | Control-vehicle test rows set to 0 |
 | Inference | Separate notebook: loads the 30 network checkpoints, 5 CatBoost models, 10 fold pipelines and the blend weights; no training |
 
-Architectural and implementation details are documented inline in the notebooks — see [`software/moa-training.ipynb`](software/moa-training.ipynb) (training) and [`software/moa-inference.ipynb`](software/moa-inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](software/README.md); the slides are in [`doc/`](doc/).
+Architectural and implementation details are documented inline in the notebooks — see [`software/moa-training.ipynb`](merlonghi-moa-prediction/software/moa-training.ipynb) (training) and [`software/moa-inference.ipynb`](merlonghi-moa-prediction/software/moa-inference.ipynb) (inference). The FT-Transformer is a simplified variant of the one in [2] (post-LayerNorm encoder, GELU feed-forward, no ReGLU). Setup and run instructions are in [`software/README.md`](merlonghi-moa-prediction/software/README.md); the slides are in [`doc/`](merlonghi-moa-prediction/doc/).
 
 ## Results
 
@@ -60,7 +60,7 @@ Out-of-fold (OOF) mean log loss over the 5 folds, treated rows only (lower is be
 | CatBoost | 0.01699 |
 | **Ensemble (nested, honest estimate)** | **0.01607 ± 0.00017** |
 
-Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. The in-sample score is 0.01606 and the nested score is 0.01607; the difference is 1.58e-6, which measures the optimism of the blending step. With only three weights to fit it is negligible. This says nothing about leakage from the CV design itself (see Limitations).
+Two blend scores are computed. The *nested* score fits the weights on 4 folds and scores them on the fifth, for each fold in turn. The *in-sample* score fits the weights on all OOF rows and scores them on the same rows. The in-sample score is 0.01606 and the nested score is 0.01607; the difference is 1.58e-6, which measures the optimism of the blending step. With only three weights to fit it is negligible. This says nothing about leakage from the CV design itself (see [Limitations](#limitations).
 The *nested* score is 27.6% lower than the *baseline* OOF log loss value.
 
 Final blend weights (averaged across the nested-CV folds):
@@ -108,7 +108,7 @@ The final model was submitted **once**, as a late submission, through the infere
 
 The cross-validation scores are computed on treated rows only, whereas the Kaggle score averages over all test rows. Control rows are predicted as 0 with true value 0 and add almost no loss, so the all-rows score is approximately the treated-only score multiplied by the share of treated rows. That share is 0.910 in the public test set, which gives the rescaled estimate 0.01607 × 0.910 = 0.01462. The share in the hidden part of the test set may differ slightly, so the rescaling is approximate.
 
-The private score is 11.8% above the rescaled CV estimate and the public score is 27.5% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see Limitations), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
+The private score is 11.8% above the rescaled CV estimate and the public score is 27.5% above it. The private score, computed on more rows, is the more reliable of the two. The cross-validated estimate is therefore optimistic. A likely cause is the lack of grouping by compound (see [Limitations](#limitations)), but this explanation was **not tested**. The consistency of the inference notebook was checked on the public test set: its predictions differ from those of the training notebook by at most 1.1e-16.
 
 ### Ablation: is an extra network worth it?
 
@@ -124,7 +124,7 @@ Three configurations with a fourth model were also run on the same folds. The ba
 
 The MLP was redundant with the ResNet (same features, same model family) and was replaced by a 1D-CNN with a different inductive bias. The CNN earns 7–8% of the weight, but no configuration improves the ensemble: all scores lie within 0.00002, below the fold standard deviation (0.00017) and the run-to-run GPU noise (about 1e-5). Giving the CNN raw instead of PCA features did not change its own OOF score (0.01661). The simpler 3-model blend was therefore kept as the final solution: fewer components to train, explain and maintain, for the same score. 
 
-The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](software/ablated-models/) (see the README of that folder for how to plug them into the training notebook). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
+The architectures of the MLP and 1D-CNN are in [`software/ablated-models/`](merlonghi-moa-prediction/software/ablated-models/). The code that registered them in the cross-validation and the logs of the ablation runs are not part of this repository, so the figures above are reported from those runs and cannot be reproduced from the repository alone.
 
 The "differences below the fold standard deviation" argument is unpaired. The per-fold scores of the ablation runs were not kept, so a paired comparison (as done above for CatBoost) was not possible; the conclusion therefore rests on the differences being of the same order as the run-to-run noise.
 
@@ -146,7 +146,7 @@ The results would rank approximately 1400th of 4,373 in the private leaderboard 
 - **Non-determinism.** Repeated GPU runs differ by about 1e-5 in OOF log loss.
 - **No ablation** of individual design choices (PCA vs. raw features for the ResNet, label smoothing) was run. The only raw-vs-PCA comparison concerns the 1D-CNN of the extra-network ablation.
 - **Mixed precision in validation, full precision at test time.** Out-of-fold predictions, and therefore the blend weights, are computed with fp16 autocast on GPU, while the inference notebook runs in fp32. On fold 0 (first seed) the two modes differ by at most 9.42e-4 (ResNet) and 3.82e-3 (FT-Transformer) in predicted probability, but the log loss is identical to six decimals (0.016815 vs. 0.016815 and 0.016856 vs. 0.016856, Step 15.1). The effect on the blend weights was not measured separately.
-- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see `software/README.md`).
+- **Inference depends on saved artifacts.** The inference notebook needs the Kaggle Dataset of trained models, which is not stored in this repository; it is produced by the training notebook (see [`software/README.md`](merlonghi-moa-prediction/software/README.md)).
 
 ## Repository structure
 
